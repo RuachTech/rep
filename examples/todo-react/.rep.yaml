@@ -1,0 +1,59 @@
+# .rep.yaml — REP manifest for the Todo React example.
+# Declares every expected variable, its tier, type, and constraints.
+# Validate with: rep validate --manifest .rep.yaml
+
+version: "0.1.0"
+
+variables:
+
+  # ── PUBLIC tier ─────────────────────────────────────────────────────────────
+  # These appear in plaintext inside the injected <script> tag.
+  # Safe to inspect via View Source. Do NOT put secrets here.
+
+  APP_TITLE:
+    tier: public
+    type: string
+    required: false
+    default: "REP Todo"
+    description: "Application title shown in the page header."
+
+  ENV_NAME:
+    tier: public
+    type: enum
+    required: true
+    values: ["development", "staging", "production"]
+    description: "Deployment environment. Controls the colour of the env badge in the UI."
+
+  API_URL:
+    tier: public
+    type: url
+    required: true
+    description: "Base URL of the backend API. Used to construct fetch() calls at runtime."
+    example: "http://localhost:3001"
+
+  MAX_TODOS:
+    tier: public
+    type: number
+    required: false
+    default: "10"
+    description: >
+      Maximum number of todos a user can create. Enforced client-side.
+      Change this at container runtime without rebuilding the app.
+
+  # ── SENSITIVE tier ───────────────────────────────────────────────────────────
+  # AES-256-GCM encrypted in the injected script tag.
+  # Requires a single-use session key from /rep/session-key to decrypt.
+  # Not visible via View Source.
+
+  ANALYTICS_KEY:
+    tier: sensitive
+    type: string
+    required: false
+    description: >
+      Analytics write key (e.g. Segment, Mixpanel). Encrypted in the page
+      payload and decrypted in the browser only when useRepSecure() is called.
+    example: "ak_live_abc123def456"
+
+settings:
+  strict_guardrails: false   # set to true in production
+  hot_reload: false
