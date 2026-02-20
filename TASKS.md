@@ -66,19 +66,19 @@ These do not break the build today but will cause problems in integration, CI, o
 
 These items are called out explicitly in the spec or security model as requirements, not suggestions.
 
-- [ ] **Replace raw AES key in `/rep/session-key` response with a derived key** (§4.4; CLAUDE.md P3)
+- [x] **Replace raw AES key in `/rep/session-key` response with a derived key** (§4.4; CLAUDE.md P3)
   - Current: `session_key.go` sends the actual 256-bit AES encryption key to the browser
   - Spec §4.4 implies the session key is used only for decryption of the sensitive blob on the client; sending the raw encryption key means a key interception gives permanent access to any future blobs until gateway restart
   - Fix: use HKDF (RFC 5869) to derive a per-session, single-use decryption key from the master encryption key + a random per-session salt; include the salt in the response; the client uses the derived key to decrypt
   - The `nonce` field already in the response schema (§4.4) is the appropriate place to carry the per-session salt
   - This requires updating the SDK's `getSecure()` to perform the HKDF derivation step using Web Crypto `deriveBits` before calling `decrypt`
 
-- [ ] **Verify SRI integrity check in SDK uses Web Crypto correctly** (§5.3 step 4; §11.2 item 2)
+- [x] **Verify SRI integrity check in SDK uses Web Crypto correctly** (§5.3 step 4; §11.2 item 2)
   - The SDK reads `data-rep-integrity="sha256-{base64}"` and must verify it against the raw JSON text content of the script tag using `SubtleCrypto.digest('SHA-256', ...)`
   - Confirm the hash is computed over the exact bytes of the JSON string as it appears in the DOM (no re-serialisation), matching how the gateway computes it
   - If this diverges, `verify()` will always return false or always return true incorrectly
 
-- [ ] **Ensure `REP_GATEWAY_*` vars are excluded from all payload tiers** (§3.1; §3.2 rule 2)
+- [x] **Ensure `REP_GATEWAY_*` vars are excluded from all payload tiers** (§3.1; §3.2 rule 2)
   - Gateway config vars share the `REP_` prefix but must never appear in PUBLIC, SENSITIVE, or SERVER classification output
   - Add an explicit test case in `classify_test.go` confirming `REP_GATEWAY_PORT`, `REP_GATEWAY_MODE`, etc. produce zero classified variables
 
@@ -92,7 +92,13 @@ These items are called out explicitly in the spec or security model as requireme
     - `rep typegen --manifest .rep.yaml --output src/rep.d.ts` — generate TypeScript overloads for `get()` and `getSecure()` keyed to declared variable names (§5.4)
     - `rep lint --dir ./dist` — scan built JS bundles for strings matching guardrail patterns (entropy, known formats) to catch secrets accidentally baked into the build (§3.3)
     - `rep dev --env .env.local --port 8080 --proxy http://localhost:5173` — local dev server wrapping the gateway binary for DX parity with `vite dev`
-  - Package name: `@rep-protocol/cli`; ship as a Node.js CLI with a `bin` entry in `package.json`; no runtime deps outside Node stdlib
+  - Package name: `@rep-protocol/cli`; ship as a Node.js CLI with a `bin` entry in `package.json`
+
+- [ ] **Migrate to pnpm workspaces** (CLAUDE.md P4)
+  - Set up `pnpm-workspace.yaml` at root
+  - Packages: `sdk`, `cli`, `adapters/*`, `codemod`
+  - Ensure shared dependencies are hoisted efficiently
+  - Update CI workflows to use pnpm
 
 - [ ] **Implement `@rep-protocol/codemod`** (§10.2; CLAUDE.md P4)
   - Transform `import.meta.env.VITE_X` → `rep.get('X')` and `process.env.REACT_APP_X` → `rep.get('X')`
