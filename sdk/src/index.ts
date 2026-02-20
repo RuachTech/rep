@@ -120,6 +120,14 @@ function _init(): void {
 /**
  * Verify the SRI hash of the payload content.
  * Uses the Web Crypto API (SubtleCrypto).
+ *
+ * Contract: the hash MUST be computed over the exact UTF-8 bytes of
+ * `el.textContent`, which equals the `json.Marshal` output that the gateway
+ * embedded in the script tag — with no re-serialisation, no whitespace
+ * changes, and no BOM. This byte-for-byte matches how the gateway's
+ * `ComputeSRI` computes the SHA-256 hash over the raw `json.Marshal` output.
+ * Any deviation (e.g. re-parsing and re-stringifying the JSON) would produce
+ * a different hash and cause `verify()` to return false.
  */
 async function _verifySRI(content: string, declared: string): Promise<boolean> {
   if (!declared.startsWith('sha256-')) return false;

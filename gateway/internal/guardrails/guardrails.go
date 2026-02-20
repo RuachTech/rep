@@ -12,7 +12,7 @@ import (
 	"math"
 	"strings"
 
-	"github.com/ruach-tech/rep/gateway/internal/config"
+	"github.com/ruachtech/rep/gateway/internal/config"
 )
 
 // Warning represents a guardrail detection event.

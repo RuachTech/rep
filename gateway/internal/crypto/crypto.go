@@ -33,12 +33,28 @@ type Keys struct {
 }
 
 // GenerateKeys creates fresh ephemeral keys.
-// These exist only in memory and are never persisted or transmitted.
+//
+// The EncryptionKey is HKDF-SHA256-derived from a master key that never
+// leaves this function. A random per-startup salt ensures the derived key
+// is unique across gateway restarts even if the PRNG output were somehow
+// repeated. Per REP-RFC-0001 §4.2 step 4: keys are ephemeral and in-memory only.
 func GenerateKeys() (*Keys, error) {
-	encKey := make([]byte, 32)
-	if _, err := rand.Read(encKey); err != nil {
-		return nil, fmt.Errorf("generating encryption key: %w", err)
+	// masterKey is ephemeral IKM — never stored, never returned from this function.
+	masterKey := make([]byte, 32)
+	if _, err := rand.Read(masterKey); err != nil {
+		return nil, fmt.Errorf("generating master key: %w", err)
 	}
+
+	// startupSalt is mixed into HKDF-Extract to ensure domain separation
+	// and uniqueness across gateway restarts.
+	startupSalt := make([]byte, 32)
+	if _, err := rand.Read(startupSalt); err != nil {
+		return nil, fmt.Errorf("generating startup salt: %w", err)
+	}
+
+	// Derive the blob encryption key via HKDF-SHA256 (RFC 5869).
+	// The master key is discarded after this call.
+	encKey := DeriveKey(masterKey, startupSalt, "rep-blob-encryption-v1", 32)
 
 	hmacKey := make([]byte, 32)
 	if _, err := rand.Read(hmacKey); err != nil {
@@ -49,6 +65,35 @@ func GenerateKeys() (*Keys, error) {
 		EncryptionKey: encKey,
 		HMACSecret:    hmacKey,
 	}, nil
+}
+
+// DeriveKey derives a fixed-length key using HKDF-SHA256 (RFC 5869).
+//
+// This is a single-round HKDF implementation valid for output lengths up to
+// 32 bytes (one SHA-256 hash output). It uses stdlib crypto/hmac and
+// crypto/sha256 only — no external dependencies.
+//
+//   - Extract: PRK = HMAC-SHA256(salt, ikm)
+//   - Expand:  T(1) = HMAC-SHA256(PRK, info || 0x01)   (one round, L ≤ 32)
+//
+// Use distinct info strings to produce independent keys from the same IKM.
+func DeriveKey(ikm, salt []byte, info string, length int) []byte {
+	if length > 32 {
+		panic("rep: DeriveKey length exceeds one HKDF-SHA256 round (max 32)")
+	}
+
+	// Extract: PRK = HMAC-SHA256(salt, IKM)
+	extractor := hmac.New(sha256.New, salt)
+	extractor.Write(ikm)
+	prk := extractor.Sum(nil)
+
+	// Expand: T(1) = HMAC-SHA256(PRK, info || 0x01)
+	expander := hmac.New(sha256.New, prk)
+	expander.Write([]byte(info))
+	expander.Write([]byte{0x01})
+	okm := expander.Sum(nil)
+
+	return okm[:length]
 }
 
 // EncryptSensitive encrypts the sensitive variables map using AES-256-GCM.

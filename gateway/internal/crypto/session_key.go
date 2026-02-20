@@ -16,6 +16,13 @@ import (
 )
 
 // SessionKeyResponse is the JSON response from /rep/session-key.
+//
+// Key is the base64-encoded AES-256 blob encryption key.
+// ExpiresAt is the RFC3339 expiry of this issuance.
+// Nonce is a 16-byte cryptographically random value, base64-encoded,
+// generated fresh per request. It is distinct from the internal tracking
+// keyID and exists to ensure each response is unique even if the same key
+// is issued multiple times within its TTL window.
 type SessionKeyResponse struct {
 	Key       string `json:"key"`
 	ExpiresAt string `json:"expires_at"`
@@ -90,7 +97,8 @@ func (h *SessionKeyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate a unique key ID for single-use tracking.
+	// Generate a unique key ID for internal single-use tracking only.
+	// This value is never transmitted to the client.
 	keyID := generateKeyID()
 	expiresAt := time.Now().UTC().Add(h.ttl)
 
@@ -99,12 +107,24 @@ func (h *SessionKeyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.issuedKeys[keyID] = expiresAt
 	h.mu.Unlock()
 
-	// The session key is the encryption key itself, base64 encoded.
-	// In a production hardening, this could be a derived key or a key-wrapping scheme.
+	// Generate a fresh per-request cryptographic nonce for the response.
+	// This is distinct from the internal keyID: the nonce is a
+	// 16-byte random value that ensures each session-key response is
+	// cryptographically unique even within the same key's TTL window.
+	requestNonce := make([]byte, 16)
+	if _, err := rand.Read(requestNonce); err != nil {
+		h.logger.Error("rep.session_key.nonce_error", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	// The session key is the HKDF-derived AES-256 blob encryption key,
+	// base64-encoded. The master key from which it was derived is ephemeral
+	// and exists only within GenerateKeys() — it never leaves that function.
 	resp := SessionKeyResponse{
 		Key:       base64.StdEncoding.EncodeToString(h.encryptionKey),
 		ExpiresAt: expiresAt.Format(time.RFC3339),
-		Nonce:     keyID,
+		Nonce:     base64.StdEncoding.EncodeToString(requestNonce),
 	}
 
 	h.logger.Info("rep.session_key.issued",

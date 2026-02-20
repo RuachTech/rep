@@ -220,3 +220,92 @@ func TestDecryptSensitive_BadBase64(t *testing.T) {
 		t.Fatal("expected error for bad base64")
 	}
 }
+
+// ─── DeriveKey (HKDF-SHA256) tests ───────────────────────────────────────────
+
+func TestDeriveKey_Deterministic(t *testing.T) {
+	ikm := make([]byte, 32)
+	salt := make([]byte, 32)
+	for i := range ikm {
+		ikm[i] = byte(i)
+		salt[i] = byte(100 + i)
+	}
+
+	k1 := DeriveKey(ikm, salt, "rep-test", 32)
+	k2 := DeriveKey(ikm, salt, "rep-test", 32)
+
+	if string(k1) != string(k2) {
+		t.Error("DeriveKey should be deterministic given identical inputs")
+	}
+}
+
+func TestDeriveKey_DifferentSalts(t *testing.T) {
+	ikm := make([]byte, 32)
+	salt1 := make([]byte, 32)
+	salt2 := make([]byte, 32)
+	for i := range salt1 {
+		salt1[i] = byte(i)
+		salt2[i] = byte(200 - i)
+	}
+
+	k1 := DeriveKey(ikm, salt1, "rep-test", 32)
+	k2 := DeriveKey(ikm, salt2, "rep-test", 32)
+
+	if string(k1) == string(k2) {
+		t.Error("different salts must produce different derived keys")
+	}
+}
+
+func TestDeriveKey_DifferentInfo(t *testing.T) {
+	ikm := make([]byte, 32)
+	salt := make([]byte, 32)
+
+	k1 := DeriveKey(ikm, salt, "rep-blob-encryption-v1", 32)
+	k2 := DeriveKey(ikm, salt, "rep-hmac-v1", 32)
+
+	if string(k1) == string(k2) {
+		t.Error("different info strings must produce different derived keys")
+	}
+}
+
+func TestDeriveKey_Length(t *testing.T) {
+	ikm := make([]byte, 32)
+	salt := make([]byte, 32)
+
+	k := DeriveKey(ikm, salt, "rep-test", 32)
+	if len(k) != 32 {
+		t.Errorf("expected 32-byte output, got %d", len(k))
+	}
+}
+
+func TestDeriveKey_IntegratesWithEncryptDecrypt(t *testing.T) {
+	// Ensure a HKDF-derived key works end-to-end in AES-256-GCM.
+	ikm := make([]byte, 32)
+	salt := make([]byte, 32)
+	for i := range ikm {
+		ikm[i] = byte(i + 7)
+		salt[i] = byte(i + 42)
+	}
+
+	derived := DeriveKey(ikm, salt, "rep-blob-encryption-v1", 32)
+	input := map[string]string{"SECRET": "from-hkdf-key"}
+	integrity := "hmac-sha256:test-aad"
+
+	blob, err := EncryptSensitive(input, derived, integrity)
+	if err != nil {
+		t.Fatalf("encrypt with derived key: %v", err)
+	}
+
+	plain, err := DecryptSensitive(blob, derived, integrity)
+	if err != nil {
+		t.Fatalf("decrypt with derived key: %v", err)
+	}
+
+	var result map[string]string
+	if err := json.Unmarshal(plain, &result); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if result["SECRET"] != "from-hkdf-key" {
+		t.Errorf("expected from-hkdf-key, got %s", result["SECRET"])
+	}
+}
