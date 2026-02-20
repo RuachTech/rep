@@ -1,0 +1,22 @@
+{
+  "name": "@rep-protocol/react",
+  "version": "0.1.0",
+  "description": "React adapter for the Runtime Environment Protocol (REP).",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "react": ">=16.8.0",
+    "@rep-protocol/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "react": "^18.2.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}

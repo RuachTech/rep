@@ -1,0 +1,22 @@
+{
+  "name": "@rep-protocol/vue",
+  "version": "0.1.0",
+  "description": "Vue adapter for the Runtime Environment Protocol (REP).",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "vue": "^3.0.0",
+    "@rep-protocol/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "vue": "^3.4.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}

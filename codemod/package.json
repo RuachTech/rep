@@ -1,0 +1,20 @@
+{
+  "name": "@rep-protocol/codemod",
+  "version": "0.1.0",
+  "description": "Codemods for migrating to the Runtime Environment Protocol (REP).",
+  "bin": {
+    "rep-codemod": "./bin/rep-codemod.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "jscodeshift": "^0.15.0",
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}

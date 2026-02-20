@@ -1,0 +1,22 @@
+{
+  "name": "@rep-protocol/svelte",
+  "version": "0.1.0",
+  "description": "Svelte adapter for the Runtime Environment Protocol (REP).",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "svelte": "^4.0.0 || ^5.0.0",
+    "@rep-protocol/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "svelte": "^4.2.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}
