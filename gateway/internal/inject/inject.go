@@ -6,11 +6,14 @@ package inject
 
 import (
 	"bytes"
+	"compress/gzip"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Middleware wraps an http.Handler and injects the REP script tag into HTML responses.
@@ -20,6 +23,9 @@ type Middleware struct {
 
 	// scriptTag is the pre-rendered <script> block to inject.
 	scriptTag []byte
+
+	// mu protects scriptTag from concurrent read/write during hot reload.
+	mu sync.RWMutex
 
 	logger *slog.Logger
 }
@@ -35,11 +41,18 @@ func New(next http.Handler, scriptTag string, logger *slog.Logger) *Middleware {
 
 // UpdateScriptTag replaces the script tag (used during hot reload).
 func (m *Middleware) UpdateScriptTag(scriptTag string) {
+	m.mu.Lock()
 	m.scriptTag = []byte(scriptTag)
+	m.mu.Unlock()
 }
 
 // ServeHTTP intercepts HTML responses and injects the REP payload.
 func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Strip Accept-Encoding from the request so the upstream always responds
+	// with identity encoding. This ensures we can reliably search for </head>
+	// in the response body for injection.
+	r.Header.Del("Accept-Encoding")
+
 	// Wrap the response writer to capture the response.
 	rec := &responseRecorder{
 		ResponseWriter: w,
@@ -59,15 +72,37 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Inject the REP script tag into the HTML.
+	// Decompress the body if the upstream ignored our Accept-Encoding removal.
 	body := rec.body.Bytes()
-	injected := injectIntoHTML(body, m.scriptTag)
+	encoding := rec.Header().Get("Content-Encoding")
+	if encoding != "" {
+		decompressed, err := decompressBody(body, encoding)
+		if err != nil {
+			// Cannot decompress — pass through unmodified.
+			m.logger.Warn("rep.inject.skip",
+				"path", r.URL.Path,
+				"reason", "unsupported Content-Encoding: "+encoding,
+			)
+			w.WriteHeader(rec.statusCode)
+			w.Write(body)
+			return
+		}
+		body = decompressed
+	}
+
+	// Copy the script tag under a read lock to avoid a data race with UpdateScriptTag.
+	m.mu.RLock()
+	tag := make([]byte, len(m.scriptTag))
+	copy(tag, m.scriptTag)
+	m.mu.RUnlock()
+
+	// Inject the REP script tag into the HTML.
+	injected := injectIntoHTML(body, tag)
 
 	// Update Content-Length to reflect the injected content.
 	w.Header().Set("Content-Length", strconv.Itoa(len(injected)))
 
 	// Remove Content-Encoding since we've modified the body.
-	// (If upstream compressed it, we've already decompressed via the recorder.)
 	w.Header().Del("Content-Encoding")
 
 	w.WriteHeader(rec.statusCode)
@@ -78,6 +113,24 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"original_size", len(body),
 		"injected_size", len(injected),
 	)
+}
+
+// decompressBody decompresses a response body based on Content-Encoding.
+// Returns an error for unsupported encodings (e.g., brotli — no stdlib support).
+func decompressBody(body []byte, encoding string) ([]byte, error) {
+	switch strings.ToLower(strings.TrimSpace(encoding)) {
+	case "gzip":
+		reader, err := gzip.NewReader(bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		defer reader.Close()
+		return io.ReadAll(reader)
+	case "identity", "":
+		return body, nil
+	default:
+		return nil, fmt.Errorf("unsupported encoding: %s", encoding)
+	}
 }
 
 // injectIntoHTML inserts the script tag into the HTML document.

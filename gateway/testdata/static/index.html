@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REP Gateway Test</title>
+</head>
+<body>
+    <h1>REP Gateway Test</h1>
+    <pre id="output"></pre>
+    <script type="module">
+        const el = document.getElementById('__rep__');
+        if (el) {
+            const payload = JSON.parse(el.textContent);
+            document.getElementById('output').textContent = JSON.stringify(payload, null, 2);
+        }
+    </script>
+</body>
+</html>
