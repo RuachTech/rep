@@ -48,6 +48,14 @@ func (m *Middleware) UpdateScriptTag(scriptTag string) {
 
 // ServeHTTP intercepts HTML responses and injects the REP payload.
 func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// WebSocket upgrade requests must bypass the recorder entirely.
+	// The recorder doesn't implement http.Hijacker, which the proxy needs
+	// to upgrade the connection (e.g. Vite HMR, live-reload sockets).
+	if isWebSocketUpgrade(r) {
+		m.next.ServeHTTP(w, r)
+		return
+	}
+
 	// Strip Accept-Encoding from the request so the upstream always responds
 	// with identity encoding. This ensures we can reliably search for </head>
 	// in the response body for injection.
@@ -146,8 +154,8 @@ func decompressBody(body []byte, encoding string) ([]byte, error) {
 //  2. After <head> (if no </head>)
 //  3. Prepend to body (if neither exists)
 func injectIntoHTML(html, scriptTag []byte) []byte {
-	// Try inserting before </head>.
-	headClose := bytes.Index(html, []byte("</head>"))
+	// Try inserting before </head>, skipping any occurrences inside HTML comments.
+	headClose := findOutsideComments(html, []byte("</head>"))
 	if headClose != -1 {
 		result := make([]byte, 0, len(html)+len(scriptTag)+1)
 		result = append(result, html[:headClose]...)
@@ -180,6 +188,67 @@ func injectIntoHTML(html, scriptTag []byte) []byte {
 	result = append(result, '\n')
 	result = append(result, html...)
 	return result
+}
+
+// findOutsideComments returns the index of the first occurrence of target
+// in html that is NOT inside an HTML comment (<!-- ... -->). Returns -1 if
+// no match is found outside a comment.
+func findOutsideComments(html, target []byte) int {
+	commentOpen := []byte("<!--")
+	commentClose := []byte("-->")
+	offset := 0
+
+	for offset < len(html) {
+		// Find the next occurrence of target.
+		idx := bytes.Index(html[offset:], target)
+		if idx == -1 {
+			return -1
+		}
+		absIdx := offset + idx
+
+		// Check if absIdx falls inside a comment by scanning from the start
+		// of the remaining window for comment boundaries.
+		if !isInsideComment(html, absIdx, commentOpen, commentClose) {
+			return absIdx
+		}
+
+		// Skip past this occurrence and keep searching.
+		offset = absIdx + len(target)
+	}
+	return -1
+}
+
+// isInsideComment reports whether position pos in html falls between a
+// <!-- opener and its corresponding --> closer.
+func isInsideComment(html []byte, pos int, open, close []byte) bool {
+	// Walk through all comment regions before pos.
+	i := 0
+	for i < pos {
+		start := bytes.Index(html[i:], open)
+		if start == -1 || i+start >= pos {
+			return false
+		}
+		start += i // absolute position of <!--
+
+		end := bytes.Index(html[start+len(open):], close)
+		if end == -1 {
+			// Unclosed comment — everything after <!-- is inside.
+			return pos >= start
+		}
+		end = start + len(open) + end + len(close) // absolute position after -->
+
+		if pos >= start && pos < end {
+			return true
+		}
+		i = end
+	}
+	return false
+}
+
+// isWebSocketUpgrade reports whether the request is a WebSocket upgrade.
+func isWebSocketUpgrade(r *http.Request) bool {
+	return strings.EqualFold(r.Header.Get("Connection"), "upgrade") &&
+		strings.EqualFold(r.Header.Get("Upgrade"), "websocket")
 }
 
 // isHTML checks if a Content-Type header indicates an HTML response.

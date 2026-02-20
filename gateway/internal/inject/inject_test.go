@@ -60,6 +60,50 @@ func TestInjectIntoHTML_HeadWithAttributes(t *testing.T) {
 	}
 }
 
+func TestInjectIntoHTML_SkipsHeadCloseInsideComment(t *testing.T) {
+	// The HTML has </head> inside a comment — the injector must skip it and
+	// inject before the real </head>.
+	html := []byte(`<html><head><!-- before </head> --><title>T</title></head><body></body></html>`)
+	result := injectIntoHTML(html, []byte(testScriptTag))
+
+	s := string(result)
+	scriptIdx := strings.Index(s, testScriptTag)
+	if scriptIdx == -1 {
+		t.Fatal("script tag not found in output")
+	}
+
+	// The script must appear AFTER the comment closes.
+	commentEnd := strings.Index(s, "-->") + len("-->")
+	if scriptIdx < commentEnd {
+		t.Errorf("script was injected inside the comment (at %d, comment ends at %d)", scriptIdx, commentEnd)
+	}
+
+	// And before the real </head>.
+	realHeadClose := strings.LastIndex(s, "</head>")
+	if scriptIdx >= realHeadClose {
+		t.Error("script should appear before the real </head>")
+	}
+}
+
+func TestInjectIntoHTML_CommentContainingOnlyHeadClose(t *testing.T) {
+	// When the ONLY </head> is inside a comment, fall through to <head> insertion.
+	html := []byte(`<html><head><!-- </head> --><body></body></html>`)
+	result := injectIntoHTML(html, []byte(testScriptTag))
+
+	s := string(result)
+	scriptIdx := strings.Index(s, testScriptTag)
+	if scriptIdx == -1 {
+		t.Fatal("script tag not found in output")
+	}
+
+	// It should have fallen through to after-<head> insertion, not inside the comment.
+	commentStart := strings.Index(s, "<!--")
+	commentEnd := strings.Index(s, "-->") + len("-->")
+	if scriptIdx > commentStart && scriptIdx < commentEnd {
+		t.Error("script was injected inside the comment")
+	}
+}
+
 func TestInjectIntoHTML_Fallback(t *testing.T) {
 	html := []byte(`<div>hello</div>`)
 	result := injectIntoHTML(html, []byte(testScriptTag))
