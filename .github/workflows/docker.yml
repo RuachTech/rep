@@ -1,0 +1,28 @@
+name: Docker Build
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'gateway/**'
+      - '.github/workflows/docker.yml'
+
+jobs:
+  build:
+    name: Docker build smoke test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: gateway
+          platforms: linux/amd64
+          push: false
+          tags: rep-gateway:smoke-test

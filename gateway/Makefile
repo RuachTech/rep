@@ -33,9 +33,14 @@ test-cover:
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
+## fmt: Format
+fmt:
+	go fmt ./...
+
 ## lint: Run static analysis (requires golangci-lint).
 lint:
 	golangci-lint run ./...
+	go vet ./...
 
 ## docker: Build the Docker image.
 docker:

@@ -81,7 +81,7 @@ This project uses **pnpm workspaces** for managing the monorepo. All TypeScript 
 
 - **Node.js** >= 20.0.0
 - **pnpm** >= 8.0.0 (install via `npm install -g pnpm`)
-- **Go** >= 1.22 (for gateway development)
+- **Go** >= 1.24.5 (for gateway development)
 
 ### Installation
 

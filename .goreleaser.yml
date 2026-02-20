@@ -1,0 +1,63 @@
+# GoReleaser configuration for REP Gateway.
+# Triggered by tags matching gateway/v* (e.g. gateway/v0.1.0).
+# See: https://goreleaser.com/customization/
+
+version: 2
+
+project_name: rep-gateway
+
+# Monorepo: Go source is in gateway/, tags are prefixed with gateway/
+monorepo:
+  tag_prefix: "gateway/"
+  dir: gateway
+
+builds:
+  - id: rep-gateway
+    main: ./cmd/rep-gateway
+    binary: rep-gateway
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X github.com/ruachtech/rep/gateway/cmd/rep-gateway.version={{.Version}}
+    flags:
+      - -trimpath
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+release:
+  github:
+    owner: ruachtech
+    name: rep
+  name_template: "Gateway v{{.Version}}"
+  # Only include commits that touched gateway/ in the changelog
+  header: |
+    ## REP Gateway {{.Version}}
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^sdk:'
+      - '^cli:'
+      - '^codemod:'
+      - '^adapters:'

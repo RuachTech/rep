@@ -131,7 +131,7 @@ func TestLogLevel(t *testing.T) {
 		{"info", slog.LevelInfo},
 		{"warn", slog.LevelWarn},
 		{"error", slog.LevelError},
-		{"", slog.LevelInfo},       // Default
+		{"", slog.LevelInfo},        // Default
 		{"unknown", slog.LevelInfo}, // Default
 	}
 

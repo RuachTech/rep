@@ -7,7 +7,12 @@
 # Size: ~5MB (static Go binary, no OS, no shell).
 
 # ── Stage 1: Build ──────────────────────────────────────────
-FROM golang:1.22-alpine AS build
+# Use the build platform (host) for the compiler stage to avoid QEMU slowdown.
+FROM --platform=$BUILDPLATFORM golang:1.24.5-alpine AS build
+
+# TARGETOS / TARGETARCH are injected by docker buildx for cross-compilation.
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
 
 WORKDIR /src
 
@@ -17,7 +22,7 @@ RUN go mod download
 
 # Copy source and build.
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
     -ldflags="-s -w -X main.version=$(cat VERSION 2>/dev/null || echo 0.1.0)" \
     -trimpath \
     -o /rep-gateway \

@@ -82,7 +82,7 @@ rep/
 │   ├── VERSION                        # Contains "0.1.0" — referenced by Makefile + Dockerfile
 │   ├── Dockerfile                     # Multi-stage, FROM scratch final image
 │   ├── Makefile                       # build, test, docker, cross-compile targets
-│   ├── go.mod                         # Module: github.com/ruachtech/rep/gateway (Go 1.22, zero deps)
+│   ├── go.mod                         # Module: github.com/ruachtech/rep/gateway (Go 1.24, zero deps)
 │   ├── go.sum                         # Module checksum file
 │   ├── cmd/rep-gateway/
 │   │   └── main.go                    # Entrypoint: flag parsing, signal handling, graceful shutdown

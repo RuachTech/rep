@@ -34,8 +34,14 @@
     }
   },
   "files": [
-    "dist/"
+    "dist/",
+    "src/",
+    "!src/**/__tests__/"
   ],
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "sideEffects": false,
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --clean --minify",
