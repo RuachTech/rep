@@ -134,7 +134,7 @@ These items are called out explicitly in the spec or security model as requireme
 
 - [ ] **Add Docker multi-arch build and GHCR publish** (CLAUDE.md P5; §9.1, §9.2 deployment patterns reference `ghcr.io/rep-protocol/gateway`)
   - Use `docker buildx` with `--platform linux/amd64,linux/arm64`
-  - Push to `ghcr.io/ruach-tech/rep/gateway:{version}` and `:latest` on release tag
+  - Push to `ghcr.io/ruachtech/rep/gateway:{version}` and `:latest` on release tag
   - The Dockerfile must produce a working image from the current source before this task is started
 
 - [ ] **Add npm provenance attestations for SDK publish** (CLAUDE.md P5)

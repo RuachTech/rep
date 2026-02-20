@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"testing"
 
-	"github.com/ruach-tech/rep/gateway/internal/config"
+	"github.com/ruachtech/rep/gateway/internal/config"
 )
 
 func makeVars(publicVars ...config.Variable) *config.ClassifiedVars {

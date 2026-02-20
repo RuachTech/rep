@@ -1,6 +1,6 @@
 # @rep-protocol/sdk
 
-Client SDK for the [Runtime Environment Protocol](https://github.com/ruach-tech/rep).
+Client SDK for the [Runtime Environment Protocol](https://github.com/ruachtech/rep).
 
 Zero-dependency, framework-agnostic, ~1.5KB gzipped. Reads environment variables injected by the REP gateway at runtime — no build tool plugins, no framework coupling.
 
@@ -69,7 +69,7 @@ Or mock the payload in your `index.html` during development:
 
 ## Specification
 
-Implements [REP-RFC-0001 §5 — Client SDK Specification](https://github.com/ruach-tech/rep/blob/main/spec/REP-RFC-0001.md#5-client-sdk-specification).
+Implements [REP-RFC-0001 §5 — Client SDK Specification](https://github.com/ruachtech/rep/blob/main/spec/REP-RFC-0001.md#5-client-sdk-specification).
 
 ## License
 

@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ruach-tech/rep/gateway/internal/config"
-	repcrypto "github.com/ruach-tech/rep/gateway/internal/crypto"
+	"github.com/ruachtech/rep/gateway/internal/config"
+	repcrypto "github.com/ruachtech/rep/gateway/internal/crypto"
 )
 
 // Payload is the JSON structure injected into HTML documents.
@@ -23,19 +23,19 @@ type Payload struct {
 
 // Meta contains metadata about the payload.
 type Meta struct {
-	Version    string `json:"version"`
-	InjectedAt string `json:"injected_at"`
-	Integrity  string `json:"integrity"`
+	Version     string `json:"version"`
+	InjectedAt  string `json:"injected_at"`
+	Integrity   string `json:"integrity"`
 	KeyEndpoint string `json:"key_endpoint,omitempty"`
-	HotReload  string `json:"hot_reload,omitempty"`
-	TTL        int    `json:"ttl"`
+	HotReload   string `json:"hot_reload,omitempty"`
+	TTL         int    `json:"ttl"`
 }
 
 // Builder constructs REP payloads from classified variables.
 type Builder struct {
-	keys       *repcrypto.Keys
-	version    string
-	hotReload  bool
+	keys      *repcrypto.Keys
+	version   string
+	hotReload bool
 }
 
 // NewBuilder creates a payload builder with the given cryptographic keys.

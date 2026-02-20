@@ -7,7 +7,7 @@
  * PUBLIC tier variables are available synchronously via `rep.get()`.
  * SENSITIVE tier variables require async decryption via `rep.getSecure()`.
  *
- * @see https://github.com/ruach-tech/rep — REP-RFC-0001 §5
+ * @see https://github.com/ruachtech/rep — REP-RFC-0001 §5
  * @license Apache-2.0
  * @version 0.1.0
  */

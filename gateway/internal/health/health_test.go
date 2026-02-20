@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ruach-tech/rep/gateway/internal/config"
-	"github.com/ruach-tech/rep/gateway/internal/guardrails"
+	"github.com/ruachtech/rep/gateway/internal/config"
+	"github.com/ruachtech/rep/gateway/internal/guardrails"
 )
 
 func TestHealth_Success(t *testing.T) {

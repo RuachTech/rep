@@ -6,10 +6,10 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ruach-tech/rep",
+    "url": "https://github.com/ruachtech/rep",
     "directory": "sdk"
   },
-  "homepage": "https://github.com/ruach-tech/rep#readme",
+  "homepage": "https://github.com/ruachtech/rep#readme",
   "keywords": [
     "environment-variables",
     "runtime-config",

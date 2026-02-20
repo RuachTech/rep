@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ruach-tech/rep/gateway/internal/config"
-	repcrypto "github.com/ruach-tech/rep/gateway/internal/crypto"
+	"github.com/ruachtech/rep/gateway/internal/config"
+	repcrypto "github.com/ruachtech/rep/gateway/internal/crypto"
 )
 
 func testKeys(t *testing.T) *repcrypto.Keys {

@@ -13,7 +13,7 @@
 //	proxy     (default) Reverse proxy to an upstream server, injecting into HTML responses.
 //	embedded  Serve static files directly with injection — no upstream server needed.
 //
-// See https://github.com/ruach-tech/rep for the full specification.
+// See https://github.com/ruachtech/rep for the full specification.
 package main
 
 import (
@@ -24,8 +24,8 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/ruach-tech/rep/gateway/internal/config"
-	"github.com/ruach-tech/rep/gateway/internal/server"
+	"github.com/ruachtech/rep/gateway/internal/config"
+	"github.com/ruachtech/rep/gateway/internal/server"
 )
 
 // version is set at build time via -ldflags.

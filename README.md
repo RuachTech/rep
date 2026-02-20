@@ -137,4 +137,4 @@ This specification is released under [CC BY 4.0](https://creativecommons.org/lic
 
 ---
 
-**REP is a proposal by [Ruach Tech](https://github.com/ruach-tech).** Built to solve a problem the entire frontend ecosystem has accepted for too long.
+**REP is a proposal by [Ruach Tech](https://github.com/ruachtech).** Built to solve a problem the entire frontend ecosystem has accepted for too long.

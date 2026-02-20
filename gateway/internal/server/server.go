@@ -22,13 +22,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ruach-tech/rep/gateway/internal/config"
-	repcrypto "github.com/ruach-tech/rep/gateway/internal/crypto"
-	"github.com/ruach-tech/rep/gateway/internal/guardrails"
-	"github.com/ruach-tech/rep/gateway/internal/health"
-	"github.com/ruach-tech/rep/gateway/internal/hotreload"
-	"github.com/ruach-tech/rep/gateway/internal/inject"
-	"github.com/ruach-tech/rep/gateway/pkg/payload"
+	"github.com/ruachtech/rep/gateway/internal/config"
+	repcrypto "github.com/ruachtech/rep/gateway/internal/crypto"
+	"github.com/ruachtech/rep/gateway/internal/guardrails"
+	"github.com/ruachtech/rep/gateway/internal/health"
+	"github.com/ruachtech/rep/gateway/internal/hotreload"
+	"github.com/ruachtech/rep/gateway/internal/inject"
+	"github.com/ruachtech/rep/gateway/pkg/payload"
 )
 
 // Server is the REP gateway server.

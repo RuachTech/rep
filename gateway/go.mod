@@ -1,4 +1,4 @@
-module github.com/ruach-tech/rep/gateway
+module github.com/ruachtech/rep/gateway
 
 go 1.22
 

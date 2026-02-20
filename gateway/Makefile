@@ -43,10 +43,10 @@ docker:
 
 ## docker-push: Push to GitHub Container Registry.
 docker-push: docker
-	docker tag rep-gateway:$(VERSION) ghcr.io/ruach-tech/rep-gateway:$(VERSION)
-	docker tag rep-gateway:latest ghcr.io/ruach-tech/rep-gateway:latest
-	docker push ghcr.io/ruach-tech/rep-gateway:$(VERSION)
-	docker push ghcr.io/ruach-tech/rep-gateway:latest
+	docker tag rep-gateway:$(VERSION) ghcr.io/ruachtech/rep-gateway:$(VERSION)
+	docker tag rep-gateway:latest ghcr.io/ruachtech/rep-gateway:latest
+	docker push ghcr.io/ruachtech/rep-gateway:$(VERSION)
+	docker push ghcr.io/ruachtech/rep-gateway:latest
 
 ## clean: Remove build artifacts.
 clean:

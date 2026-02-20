@@ -10,8 +10,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ruach-tech/rep/gateway/internal/config"
-	"github.com/ruach-tech/rep/gateway/internal/guardrails"
+	"github.com/ruachtech/rep/gateway/internal/config"
+	"github.com/ruachtech/rep/gateway/internal/guardrails"
 )
 
 // Response is the JSON body returned by /rep/health.

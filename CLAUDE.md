@@ -3,7 +3,7 @@
 ## Project Identity
 
 **Name:** REP — Runtime Environment Protocol
-**Organisation:** Ruach Tech (`github.com/ruach-tech`)
+**Organisation:** Ruach Tech (`github.com/ruachtech`)
 **Author:** Olamide Adebayo
 **License:** Spec documents under CC BY 4.0, code under Apache 2.0
 **Status:** Draft specification + reference implementation (pre-release, not yet published)
@@ -84,7 +84,7 @@ rep/
 │   ├── VERSION                        # Contains "0.1.0" — referenced by Makefile + Dockerfile
 │   ├── Dockerfile                     # Multi-stage, FROM scratch final image
 │   ├── Makefile                       # build, test, docker, cross-compile targets
-│   ├── go.mod                         # Module: github.com/ruach-tech/rep/gateway (Go 1.22, zero deps)
+│   ├── go.mod                         # Module: github.com/ruachtech/rep/gateway (Go 1.22, zero deps)
 │   ├── go.sum                         # Module checksum file
 │   ├── cmd/rep-gateway/
 │   │   └── main.go                    # Entrypoint: flag parsing, signal handling, graceful shutdown
@@ -293,7 +293,7 @@ Full threat analysis with 7 specific threats, mitigations, and honest residual r
 
 #### Priority 5: Publishing & Distribution
 
-- [ ] **GitHub repo setup** — `github.com/ruach-tech/rep` with:
+- [ ] **GitHub repo setup** — `github.com/ruachtech/rep` with:
   - GitHub Actions CI (Go test + lint, SDK test + build, Docker build)
   - Release workflow (GoReleaser for multi-platform binaries)
   - GHCR publish for Docker image

@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ruach-tech/rep/gateway/internal/manifest"
+	"github.com/ruachtech/rep/gateway/internal/manifest"
 )
 
 // Config holds the parsed gateway configuration.
