@@ -1,0 +1,53 @@
+{
+  "name": "@rep-protocol/sdk",
+  "version": "0.1.0",
+  "description": "Client SDK for the Runtime Environment Protocol (REP). Zero-dependency, framework-agnostic runtime env var access for browser applications.",
+  "author": "Ruach Tech",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruach-tech/rep",
+    "directory": "sdk"
+  },
+  "homepage": "https://github.com/ruach-tech/rep#readme",
+  "keywords": [
+    "environment-variables",
+    "runtime-config",
+    "docker",
+    "containers",
+    "frontend",
+    "twelve-factor",
+    "spa",
+    "react",
+    "vue",
+    "svelte",
+    "angular"
+  ],
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist/"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean --minify",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}
