@@ -62,7 +62,6 @@ The Parcel GitHub issue #4049 explicitly states: "sensitive environment variable
 
 ```
 rep/
-├── CLAUDE.md                          # THIS FILE — agent handover
 ├── LICENSE                            # CC BY 4.0 (spec) + Apache 2.0 (code)
 ├── README.md                          # Project overview, quick start, positioning
 │
