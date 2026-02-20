@@ -1,0 +1,104 @@
+# .rep.yaml — Example REP manifest for a typical SPA
+# This file declares all expected environment variables,
+# their classification, types, and constraints.
+
+version: "0.1.0"
+
+variables:
+  # ─── PUBLIC TIER ───────────────────────────────────────────
+  # Visible in page source. Safe for anyone to see.
+
+  API_URL:
+    tier: public
+    type: url
+    required: true
+    description: "Base URL for the backend REST API"
+    example: "https://api.example.com"
+
+  WS_URL:
+    tier: public
+    type: url
+    required: false
+    description: "WebSocket endpoint for real-time features"
+    example: "wss://ws.example.com"
+
+  FEATURE_FLAGS:
+    tier: public
+    type: csv
+    required: false
+    default: ""
+    description: "Comma-separated list of enabled feature flags"
+    example: "dark-mode,new-checkout,ai-assist"
+
+  APP_VERSION:
+    tier: public
+    type: string
+    required: false
+    default: "0.0.0"
+    description: "Application version displayed in UI footer"
+
+  ENV_NAME:
+    tier: public
+    type: enum
+    required: true
+    values: ["development", "staging", "production"]
+    description: "Current deployment environment name"
+
+  CDN_BASE_URL:
+    tier: public
+    type: url
+    required: false
+    description: "Base URL for static asset CDN"
+    example: "https://cdn.example.com/assets"
+
+  # ─── SENSITIVE TIER ────────────────────────────────────────
+  # Encrypted in transit. Requires session key to decrypt.
+  # Not visible via View Source.
+
+  ANALYTICS_WRITE_KEY:
+    tier: sensitive
+    type: string
+    required: true
+    description: "Analytics service write key (e.g., Segment, Mixpanel)"
+    example: "wk_abc123def456"
+
+  SENTRY_DSN:
+    tier: sensitive
+    type: url
+    required: false
+    description: "Sentry error reporting DSN"
+    example: "https://abc123@o123456.ingest.sentry.io/1234567"
+
+  OAUTH_CLIENT_ID:
+    tier: sensitive
+    type: string
+    required: true
+    description: "OAuth 2.0 client identifier for authentication"
+    pattern: "^[a-zA-Z0-9]{20,}$"
+
+  # ─── SERVER TIER ───────────────────────────────────────────
+  # NEVER sent to the browser. Gateway-only.
+
+  UPSTREAM_AUTH_TOKEN:
+    tier: server
+    type: string
+    required: false
+    description: "Bearer token for the gateway to use when proxying to upstream services"
+
+  RATE_LIMIT_OVERRIDE:
+    tier: server
+    type: number
+    required: false
+    description: "Override the default session key rate limit (for testing)"
+
+# ─── GATEWAY SETTINGS ───────────────────────────────────────
+
+settings:
+  strict_guardrails: true
+  hot_reload: true
+  hot_reload_mode: "signal"
+  session_key_ttl: "30s"
+  session_key_max_rate: 10
+  allowed_origins:
+    - "https://app.example.com"
+    - "https://staging.app.example.com"
