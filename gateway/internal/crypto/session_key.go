@@ -31,7 +31,7 @@ type SessionKeyHandler struct {
 	logger         *slog.Logger
 
 	mu          sync.Mutex
-	issuedKeys  map[string]time.Time // keyID → expiry (for single-use tracking)
+	issuedKeys  map[string]time.Time   // keyID → expiry (for single-use tracking)
 	rateLimiter map[string][]time.Time // IP → request timestamps
 }
 
@@ -127,7 +127,9 @@ func (h *SessionKeyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Vary", "Origin")
 	}
 
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		h.logger.Error("rep.session_key.encode_error", "error", err)
+	}
 }
 
 // isOriginAllowed checks if the origin is in the allowed list.
@@ -211,7 +213,11 @@ func (h *SessionKeyHandler) cleanup() {
 // generateKeyID creates a random identifier for session key tracking.
 func generateKeyID() string {
 	b := make([]byte, 16)
-	rand.Read(b)
+	// crypto/rand.Read never returns an error in Go 1.20+; panic on the
+	// unreachable error path to satisfy errcheck.
+	if _, err := rand.Read(b); err != nil {
+		panic("rep: crypto/rand.Read failed: " + err.Error())
+	}
 	return base64.URLEncoding.EncodeToString(b)
 }
 

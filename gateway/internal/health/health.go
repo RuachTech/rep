@@ -6,6 +6,7 @@ package health
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -15,11 +16,11 @@ import (
 
 // Response is the JSON body returned by /rep/health.
 type Response struct {
-	Status    string         `json:"status"`
-	Version   string         `json:"version"`
-	Variables VariableCounts `json:"variables"`
-	Guardrails GuardrailStatus `json:"guardrails"`
-	UptimeSeconds int64       `json:"uptime_seconds"`
+	Status        string          `json:"status"`
+	Version       string          `json:"version"`
+	Variables     VariableCounts  `json:"variables"`
+	Guardrails    GuardrailStatus `json:"guardrails"`
+	UptimeSeconds int64           `json:"uptime_seconds"`
 }
 
 // VariableCounts holds per-tier variable counts.
@@ -37,19 +38,19 @@ type GuardrailStatus struct {
 
 // Handler serves the /rep/health endpoint.
 type Handler struct {
-	version        string
-	vars           *config.ClassifiedVars
+	version         string
+	vars            *config.ClassifiedVars
 	guardrailResult *guardrails.Result
-	startTime      time.Time
+	startTime       time.Time
 }
 
 // NewHandler creates a new health check handler.
 func NewHandler(version string, vars *config.ClassifiedVars, gr *guardrails.Result, startTime time.Time) *Handler {
 	return &Handler{
-		version:        version,
-		vars:           vars,
+		version:         version,
+		vars:            vars,
 		guardrailResult: gr,
-		startTime:      startTime,
+		startTime:       startTime,
 	}
 }
 
@@ -83,5 +84,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-cache")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		slog.Default().Error("rep.health.encode_error", "error", err)
+	}
 }

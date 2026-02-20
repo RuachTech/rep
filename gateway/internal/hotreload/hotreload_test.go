@@ -125,7 +125,7 @@ func TestSSEHandler_Headers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if ct := resp.Header.Get("Content-Type"); ct != "text/event-stream" {
 		t.Errorf("expected text/event-stream, got %q", ct)
@@ -146,7 +146,7 @@ func TestSSEHandler_ReceivesEvent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	scanner := bufio.NewScanner(resp.Body)
 

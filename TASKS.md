@@ -8,7 +8,7 @@ This file tracks all known implementation gaps between the current codebase and 
 
 These gaps mean the current implementation is either broken at runtime, non-conformant with the spec, or structurally unsound.
 
-- [ ] **Write Go unit tests for all gateway packages** (§11.1 conformance checklist; CLAUDE.md P1)
+- [x] **Write Go unit tests for all gateway packages** (§11.1 conformance checklist; CLAUDE.md P1)
   - `internal/config/classify_test.go` — prefix stripping, tier assignment, collision detection (two vars that collide after stripping must cause startup failure per §3.2 rule 4)
   - `internal/crypto/crypto_test.go` — AES-256-GCM encrypt/decrypt roundtrip, HMAC-SHA256 computation, SRI hash, AAD binding (§8.2, §8.3)
   - `internal/guardrails/guardrails_test.go` — entropy threshold (> 4.5 bits/char), each known format pattern (AKIA, eyJ, ghp_, sk_live_, -----BEGIN, etc.) (§3.3)
@@ -18,25 +18,25 @@ These gaps mean the current implementation is either broken at runtime, non-conf
   - `internal/server/server_test.go` — integration test via `net/http/httptest` covering proxy and embedded modes
   - Run `go test ./...` to gate the build
 
-- [ ] **Write TypeScript SDK tests** (§11.2 conformance checklist; CLAUDE.md P1)
+- [x] **Write TypeScript SDK tests** (§11.2 conformance checklist; CLAUDE.md P1)
   - `sdk/src/__tests__/index.test.ts` using vitest + JSDOM
   - Cover: payload discovery, `get()` returns correct value synchronously, `get()` with missing key returns `undefined`, `get()` with default returns default, `verify()` returns false on tampered `data-rep-integrity`, `meta()` shape, `getSecure()` throws on missing sensitive blob
   - Confirm no network call is made during module import (§5.3 critical requirement)
 
-- [ ] **Add `gateway/VERSION` file** (CLAUDE.md P2; Makefile `cat VERSION` will fail without it)
+- [x] **Add `gateway/VERSION` file** (CLAUDE.md P2; Makefile `cat VERSION` will fail without it)
   - Create `gateway/VERSION` containing `0.1.0`
   - The Dockerfile and Makefile both reference this file; without it `make build` and `make docker` produce broken outputs
 
-- [ ] **Create `gateway/testdata/static/index.html`** (CLAUDE.md P2; `make run-example` is broken without it)
+- [x] **Create `gateway/testdata/static/index.html`** (CLAUDE.md P2; `make run-example` is broken without it)
   - Minimal valid HTML file with `<head>` and `<body>` tags so `make run-example` can exercise the injection path end-to-end
   - Must include `<script type="module">` importing `@rep-protocol/sdk` to demonstrate the full flow
 
-- [ ] **Add mutex to `inject.go` `UpdateScriptTag()`** (CLAUDE.md P3; §4.6 hot reload correctness)
+- [x] **Add mutex to `inject.go` `UpdateScriptTag()`** (CLAUDE.md P3; §4.6 hot reload correctness)
   - `UpdateScriptTag()` mutates `m.scriptTag` with no synchronisation
   - Hot reload (SIGHUP) runs on the signal goroutine; HTTP handlers run on separate goroutines — this is a data race
   - Add `sync.RWMutex`: write-lock in `UpdateScriptTag()`, read-lock in the injection middleware
 
-- [ ] **Handle gzip/brotli compressed upstream responses in `inject.go`** (CLAUDE.md P3; §4.3 injection correctness)
+- [x] **Handle gzip/brotli compressed upstream responses in `inject.go`** (CLAUDE.md P3; §4.3 injection correctness)
   - The `responseRecorder` captures raw bytes; if the upstream returns `Content-Encoding: gzip` or `br`, the byte slice is compressed and string-searching for `</head>` will fail silently, producing a corrupted response
   - Fix: strip `Accept-Encoding` from proxied requests so the upstream always responds with identity encoding, OR decompress before injection and re-compress after
   - Stripping `Accept-Encoding` is simpler and has no correctness risk; compression can be re-applied by the gateway itself
@@ -47,14 +47,14 @@ These gaps mean the current implementation is either broken at runtime, non-conf
 
 These do not break the build today but will cause problems in integration, CI, or contributor onboarding.
 
-- [ ] **Implement manifest loading in the gateway** (§6; CLAUDE.md P2 — currently a no-op)
+- [x] **Implement manifest loading in the gateway** (§6; CLAUDE.md P2 — currently a no-op)
   - `--manifest` flag is parsed but the file is never read or validated
   - The spec requires gateway validation at startup against the manifest (§6, §4.2 step 3 extended)
   - Constraint: zero external Go dependencies — see CLAUDE.md "Technical Decisions" for the four options under consideration (minimal hand-rolled parser, single vendored file, `gopkg.in/yaml.v3` exception, or JSON manifest). Decision must be made before implementation starts.
   - Validation must cover: required variables present in env, pattern constraints (§6.2), type validation (url, number, boolean, csv, json, enum), and `strict_guardrails` setting
   - Log a structured error and exit non-zero on validation failure
 
-- [ ] **Implement `file_watch` and `poll` hot reload modes** (§4.6; CLAUDE.md P3 — only `signal` is wired)
+- [x] **Implement `file_watch` and `poll` hot reload modes** (§4.6; CLAUDE.md P3 — only `signal` is wired)
   - `file_watch` mode: use `os.ReadDir` polling or `fsnotify`-equivalent via syscall (`inotify` on Linux, `kqueue` on Darwin) — no external deps; alternatively, a tight `time.Ticker` loop stat-checking the `--watch-path` file's mtime is acceptable for v0.1
   - `poll` mode: `time.Ticker` loop re-reading env vars (or re-reading a flat file at `--watch-path`) every `--poll-interval`
   - On change detection, both modes must trigger the same re-classification → re-encryption → SSE broadcast path that SIGHUP currently uses

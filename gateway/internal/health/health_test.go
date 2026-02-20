@@ -76,7 +76,9 @@ func TestHealth_VariableCounts(t *testing.T) {
 	h.ServeHTTP(rec, req)
 
 	var resp Response
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
 
 	if resp.Variables.Public != 3 || resp.Variables.Sensitive != 2 || resp.Variables.Server != 1 {
 		t.Errorf("counts mismatch: %+v", resp.Variables)
@@ -92,7 +94,9 @@ func TestHealth_Uptime(t *testing.T) {
 	h.ServeHTTP(rec, req)
 
 	var resp Response
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
 
 	if resp.UptimeSeconds < 5 {
 		t.Errorf("expected uptime >= 5s, got %d", resp.UptimeSeconds)
@@ -113,7 +117,9 @@ func TestHealth_GuardrailWarnings(t *testing.T) {
 	h.ServeHTTP(rec, req)
 
 	var resp Response
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
 
 	if resp.Guardrails.Warnings != 2 {
 		t.Errorf("expected 2 warnings, got %d", resp.Guardrails.Warnings)
@@ -128,7 +134,9 @@ func TestHealth_NilGuardrails(t *testing.T) {
 	h.ServeHTTP(rec, req)
 
 	var resp Response
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode error: %v", err)
+	}
 
 	if resp.Guardrails.Warnings != 0 {
 		t.Errorf("expected 0 warnings with nil guardrails, got %d", resp.Guardrails.Warnings)

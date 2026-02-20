@@ -14,7 +14,9 @@ func clearREPEnv(t *testing.T) {
 				key := env[:i]
 				if len(key) >= 4 && key[:4] == "REP_" {
 					t.Setenv(key, "")
-					os.Unsetenv(key)
+					if err := os.Unsetenv(key); err != nil {
+						t.Errorf("failed to unsetenv %q: %v", key, err)
+					}
 				}
 				break
 			}

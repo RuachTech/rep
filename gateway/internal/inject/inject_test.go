@@ -82,7 +82,7 @@ func TestInjectIntoHTML_EmptyDocument(t *testing.T) {
 func TestMiddleware_HTMLResponse(t *testing.T) {
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(`<html><head></head><body>Hello</body></html>`))
+		_, _ = w.Write([]byte(`<html><head></head><body>Hello</body></html>`))
 	})
 
 	m := New(upstream, testScriptTag, slog.Default())
@@ -105,7 +105,7 @@ func TestMiddleware_NonHTMLResponse(t *testing.T) {
 	jsonBody := `{"key":"value"}`
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(jsonBody))
+		_, _ = w.Write([]byte(jsonBody))
 	})
 
 	m := New(upstream, testScriptTag, slog.Default())
@@ -124,7 +124,7 @@ func TestMiddleware_NonHTMLResponse(t *testing.T) {
 func TestMiddleware_ContentLengthUpdated(t *testing.T) {
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write([]byte(`<html><head></head><body></body></html>`))
+		_, _ = w.Write([]byte(`<html><head></head><body></body></html>`))
 	})
 
 	m := New(upstream, testScriptTag, slog.Default())
@@ -170,7 +170,7 @@ func TestIsHTML(t *testing.T) {
 func TestUpdateScriptTag_ConcurrentSafety(t *testing.T) {
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(`<html><head></head><body></body></html>`))
+		_, _ = w.Write([]byte(`<html><head></head><body></body></html>`))
 	})
 
 	m := New(upstream, testScriptTag, slog.Default())

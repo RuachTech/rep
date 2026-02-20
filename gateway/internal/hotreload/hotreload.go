@@ -113,7 +113,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer unsub()
 
 	// Send initial ping to confirm connection.
-	fmt.Fprintf(w, ": connected to REP hot reload\n\n")
+	_, _ = fmt.Fprintf(w, ": connected to REP hot reload\n\n")
 	flusher.Flush()
 
 	// Keep-alive ticker.
@@ -133,14 +133,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				"value": event.Value,
 			})
 
-			fmt.Fprintf(w, "event: %s\n", event.Type)
-			fmt.Fprintf(w, "data: %s\n", string(data))
-			fmt.Fprintf(w, "id: %d\n\n", time.Now().UnixMilli())
+			_, _ = fmt.Fprintf(w, "event: %s\n", event.Type)
+			_, _ = fmt.Fprintf(w, "data: %s\n", string(data))
+			_, _ = fmt.Fprintf(w, "id: %d\n\n", time.Now().UnixMilli())
 			flusher.Flush()
 
 		case <-ticker.C:
 			// Keep-alive comment to prevent proxy timeouts.
-			fmt.Fprintf(w, ": keepalive\n\n")
+			_, _ = fmt.Fprintf(w, ": keepalive\n\n")
 			flusher.Flush()
 
 		case <-r.Context().Done():

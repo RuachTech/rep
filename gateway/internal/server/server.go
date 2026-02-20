@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -36,13 +37,13 @@ type Server struct {
 	logger  *slog.Logger
 	version string
 
-	vars          *config.ClassifiedVars
-	keys          *repcrypto.Keys
-	injector      *inject.Middleware
-	hotReloadHub  *hotreload.Hub
-	httpServer    *http.Server
-	healthServer  *http.Server // Optional separate health server.
-	startTime     time.Time
+	vars         *config.ClassifiedVars
+	keys         *repcrypto.Keys
+	injector     *inject.Middleware
+	hotReloadHub *hotreload.Hub
+	httpServer   *http.Server
+	healthServer *http.Server // Optional separate health server.
+	startTime    time.Time
 }
 
 // New creates and initialises a new REP gateway server.
@@ -62,6 +63,19 @@ func New(cfg *config.Config, logger *slog.Logger, version string) (*Server, erro
 		return nil, fmt.Errorf("classifying variables: %w", err)
 	}
 	s.vars = vars
+
+	// Step 2b: Validate against manifest if one was loaded (§6, §4.2 step 3).
+	if cfg.Manifest != nil {
+		logger.Info("validating environment variables against manifest", "manifest", cfg.ManifestPath)
+		if err := cfg.Manifest.Validate(
+			vars.PublicMap(),
+			vars.SensitiveMap(),
+			vars.ServerMap(),
+			func(msg string, args ...any) { logger.Warn(msg, args...) },
+		); err != nil {
+			return nil, fmt.Errorf("manifest validation: %w", err)
+		}
+	}
 
 	// Step 3–4: Run secret detection guardrails.
 	logger.Info("running guardrail scan on PUBLIC tier variables")
@@ -210,6 +224,16 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}()
 
+	// Start hot reload watcher for file_watch and poll modes.
+	if s.cfg.HotReload {
+		switch s.cfg.HotReloadMode {
+		case "file_watch":
+			go s.runFileWatcher(ctx)
+		case "poll":
+			go s.runPoller(ctx)
+		}
+	}
+
 	// Wait for shutdown signal or error.
 	select {
 	case <-ctx.Done():
@@ -218,13 +242,128 @@ func (s *Server) Start(ctx context.Context) error {
 		defer cancel()
 
 		if s.healthServer != nil {
-			s.healthServer.Shutdown(shutdownCtx)
+			if err := s.healthServer.Shutdown(shutdownCtx); err != nil {
+				s.logger.Error("health server shutdown error", "error", err)
+			}
 		}
 		return s.httpServer.Shutdown(shutdownCtx)
 
 	case err := <-errCh:
 		return err
 	}
+}
+
+// runFileWatcher runs a background goroutine that watches a file for mtime
+// changes and triggers Reload() when a change is detected.
+// This implements the "file_watch" hot reload mode (REP-RFC-0001 §4.6).
+//
+// The ticker interval defaults to the configured PollInterval (used as the
+// stat frequency); a 5-second fallback is applied when the interval is zero.
+func (s *Server) runFileWatcher(ctx context.Context) {
+	path := s.cfg.WatchPath
+	if path == "" {
+		s.logger.Warn("rep.hotreload.file_watch: --watch-path not set; file_watch mode disabled")
+		return
+	}
+
+	interval := s.cfg.PollInterval
+	if interval <= 0 {
+		interval = 5 * time.Second
+	}
+
+	// Record the initial mtime.
+	var lastMod time.Time
+	if fi, err := os.Stat(path); err == nil {
+		lastMod = fi.ModTime()
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	s.logger.Info("rep.hotreload.file_watch.started",
+		"path", path,
+		"interval", interval.String(),
+	)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			fi, err := os.Stat(path)
+			if err != nil {
+				s.logger.Warn("rep.hotreload.file_watch.stat_error",
+					"path", path, "error", err)
+				continue
+			}
+			if fi.ModTime().After(lastMod) {
+				s.logger.Info("rep.hotreload.file_watch.changed", "path", path)
+				lastMod = fi.ModTime()
+				if err := s.Reload(); err != nil {
+					s.logger.Error("rep.hotreload.reload_failed", "error", err)
+				}
+			}
+		}
+	}
+}
+
+// runPoller runs a background goroutine that re-reads environment variables on
+// every PollInterval tick and triggers Reload() when any change is detected.
+// This implements the "poll" hot reload mode (REP-RFC-0001 §4.6).
+func (s *Server) runPoller(ctx context.Context) {
+	interval := s.cfg.PollInterval
+	if interval <= 0 {
+		interval = 30 * time.Second
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	s.logger.Info("rep.hotreload.poll.started", "interval", interval.String())
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			newVars, err := config.ReadAndClassify()
+			if err != nil {
+				s.logger.Error("rep.hotreload.poll.classify_error", "error", err)
+				continue
+			}
+			if varsChanged(s.vars, newVars) {
+				s.logger.Info("rep.hotreload.poll.changed")
+				if err := s.Reload(); err != nil {
+					s.logger.Error("rep.hotreload.reload_failed", "error", err)
+				}
+			}
+		}
+	}
+}
+
+// varsChanged returns true when any public variable value has changed between
+// old and new. Sensitive and server variables are not compared because they
+// are never exposed to the client in plain text.
+func varsChanged(old, new *config.ClassifiedVars) bool {
+	if old == nil || new == nil {
+		return true
+	}
+	oldMap := old.PublicMap()
+	newMap := new.PublicMap()
+	if len(oldMap) != len(newMap) {
+		return true
+	}
+	for k, v := range newMap {
+		if oldMap[k] != v {
+			return true
+		}
+	}
+	for k := range oldMap {
+		if _, ok := newMap[k]; !ok {
+			return true
+		}
+	}
+	return false
 }
 
 // Reload re-reads environment variables and rebuilds the payload.

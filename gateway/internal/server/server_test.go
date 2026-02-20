@@ -84,7 +84,7 @@ func TestServer_HealthEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
@@ -118,7 +118,7 @@ func TestServer_HTMLInjection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
@@ -156,7 +156,7 @@ func TestServer_SessionKeyEndpoint(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.StatusCode)
@@ -187,7 +187,7 @@ func TestServer_NoSessionKeyWithoutSensitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GET error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", resp.StatusCode)

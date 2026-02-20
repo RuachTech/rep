@@ -78,6 +78,15 @@ func (cv *ClassifiedVars) SensitiveMap() map[string]string {
 	return m
 }
 
+// ServerMap returns a map of name → value for all SERVER tier variables.
+func (cv *ClassifiedVars) ServerMap() map[string]string {
+	m := make(map[string]string, len(cv.Server))
+	for _, v := range cv.Server {
+		m[v.Name] = v.Value
+	}
+	return m
+}
+
 // ReadAndClassify reads all environment variables, filters for the REP_ prefix,
 // classifies them, strips prefixes, and validates uniqueness.
 //

@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ruach-tech/rep/gateway/internal/manifest"
 )
 
 // Config holds the parsed gateway configuration.
@@ -45,8 +47,8 @@ type Config struct {
 	PollInterval  time.Duration
 
 	// Logging.
-	LogFormat    string // "json" or "text"
-	LogLevelStr  string // "debug", "info", "warn", "error"
+	LogFormat   string // "json" or "text"
+	LogLevelStr string // "debug", "info", "warn", "error"
 
 	// CORS allowed origins for /rep/session-key.
 	AllowedOrigins []string
@@ -64,6 +66,9 @@ type Config struct {
 
 	// Version flag.
 	ShowVersion bool
+
+	// Loaded manifest (nil if --manifest was not specified or load failed).
+	Manifest *manifest.Manifest
 }
 
 // LogLevel returns the slog.Level corresponding to the configured log level string.
@@ -81,9 +86,55 @@ func (c *Config) LogLevel() slog.Level {
 }
 
 // Parse reads configuration from CLI flags and environment variables.
-// CLI flags take precedence over environment variables.
+// Precedence (highest to lowest): CLI flags > REP_GATEWAY_* env vars > .rep.yaml settings > defaults.
 func Parse(args []string, version string) (*Config, error) {
 	cfg := &Config{}
+
+	// ── Phase 1: Pre-scan for --manifest so we can seed flag defaults from it ──
+	manifestPath := prescanManifestFlag(args)
+	if manifestPath == "" {
+		manifestPath = os.Getenv("REP_GATEWAY_MANIFEST")
+	}
+	cfg.ManifestPath = manifestPath
+	if manifestPath != "" {
+		m, err := manifest.Load(manifestPath)
+		if err != nil {
+			return nil, fmt.Errorf("loading manifest: %w", err)
+		}
+		cfg.Manifest = m
+	}
+
+	// ── Phase 2: Compute manifest-derived defaults for settings ──────────────
+	// These are overridden by REP_GATEWAY_* env vars and CLI flags below.
+	defaultHotReload := false
+	defaultHotReloadMode := "signal"
+	defaultPollInterval := "30s"
+	defaultSessionTTL := "30s"
+	defaultSessionMaxRate := 10
+	defaultStrict := false
+	var defaultAllowedOrigins string
+
+	if m := cfg.Manifest; m != nil && m.Settings != nil {
+		defaultHotReload = m.Settings.HotReload
+		if m.Settings.HotReloadMode != "" {
+			defaultHotReloadMode = m.Settings.HotReloadMode
+		}
+		if m.Settings.HotReloadPollInterval > 0 {
+			defaultPollInterval = m.Settings.HotReloadPollInterval.String()
+		}
+		if m.Settings.SessionKeyTTL > 0 {
+			defaultSessionTTL = m.Settings.SessionKeyTTL.String()
+		}
+		if m.Settings.SessionKeyMaxRate > 0 {
+			defaultSessionMaxRate = m.Settings.SessionKeyMaxRate
+		}
+		defaultStrict = m.Settings.StrictGuardrails
+		if len(m.Settings.AllowedOrigins) > 0 {
+			defaultAllowedOrigins = strings.Join(m.Settings.AllowedOrigins, ",")
+		}
+	}
+
+	// ── Phase 3: Parse flags (env vars overlay manifest, CLI flags overlay both)
 	fs := flag.NewFlagSet("rep-gateway", flag.ContinueOnError)
 
 	// Register flags.
@@ -91,23 +142,20 @@ func Parse(args []string, version string) (*Config, error) {
 	fs.StringVar(&cfg.Upstream, "upstream", envOrDefault("REP_GATEWAY_UPSTREAM", "localhost:80"), "Upstream server address (proxy mode)")
 	fs.IntVar(&cfg.Port, "port", envOrDefaultInt("REP_GATEWAY_PORT", 8080), "Listen port")
 	fs.StringVar(&cfg.StaticDir, "static-dir", envOrDefault("REP_GATEWAY_STATIC_DIR", "/usr/share/nginx/html"), "Static file directory (embedded mode)")
-	// TODO(manifest): ManifestPath is stored but never read. Implement YAML
-	// parsing, required-variable validation, type checking, and settings
-	// overlay (manifest < env < flag precedence) per REP-RFC-0001 §6.
-	fs.StringVar(&cfg.ManifestPath, "manifest", envOrDefault("REP_GATEWAY_MANIFEST", ""), "Path to .rep.yaml manifest")
-	fs.BoolVar(&cfg.Strict, "strict", envOrDefaultBool("REP_GATEWAY_STRICT", false), "Exit on guardrail warnings")
-	fs.BoolVar(&cfg.HotReload, "hot-reload", envOrDefaultBool("REP_GATEWAY_HOT_RELOAD", false), "Enable hot reload SSE endpoint")
-	fs.StringVar(&cfg.HotReloadMode, "hot-reload-mode", envOrDefault("REP_GATEWAY_HOT_RELOAD_MODE", "signal"), `Hot reload mode: "file_watch", "signal", "poll"`)
+	fs.StringVar(&cfg.ManifestPath, "manifest", envOrDefault("REP_GATEWAY_MANIFEST", manifestPath), "Path to .rep.yaml manifest")
+	fs.BoolVar(&cfg.Strict, "strict", envOrDefaultBool("REP_GATEWAY_STRICT", defaultStrict), "Exit on guardrail warnings")
+	fs.BoolVar(&cfg.HotReload, "hot-reload", envOrDefaultBool("REP_GATEWAY_HOT_RELOAD", defaultHotReload), "Enable hot reload SSE endpoint")
+	fs.StringVar(&cfg.HotReloadMode, "hot-reload-mode", envOrDefault("REP_GATEWAY_HOT_RELOAD_MODE", defaultHotReloadMode), `Hot reload mode: "file_watch", "signal", or "poll"`)
 	fs.StringVar(&cfg.WatchPath, "watch-path", envOrDefault("REP_GATEWAY_WATCH_PATH", ""), "Path to watch for config changes (file_watch mode)")
-	pollInterval := fs.String("poll-interval", envOrDefault("REP_GATEWAY_POLL_INTERVAL", "30s"), "Poll interval (poll mode)")
+	pollInterval := fs.String("poll-interval", envOrDefault("REP_GATEWAY_POLL_INTERVAL", defaultPollInterval), "Poll interval (poll mode)")
 	fs.StringVar(&cfg.LogFormat, "log-format", envOrDefault("REP_GATEWAY_LOG_FORMAT", "json"), `Log format: "json" or "text"`)
 	fs.StringVar(&cfg.LogLevelStr, "log-level", envOrDefault("REP_GATEWAY_LOG_LEVEL", "info"), `Log level: "debug", "info", "warn", "error"`)
-	originsStr := fs.String("allowed-origins", envOrDefault("REP_GATEWAY_ALLOWED_ORIGINS", ""), "Comma-separated allowed CORS origins for /rep/session-key")
+	originsStr := fs.String("allowed-origins", envOrDefault("REP_GATEWAY_ALLOWED_ORIGINS", defaultAllowedOrigins), "Comma-separated allowed CORS origins for /rep/session-key")
 	fs.StringVar(&cfg.TLSCert, "tls-cert", envOrDefault("REP_GATEWAY_TLS_CERT", ""), "TLS certificate path")
 	fs.StringVar(&cfg.TLSKey, "tls-key", envOrDefault("REP_GATEWAY_TLS_KEY", ""), "TLS private key path")
 	fs.IntVar(&cfg.HealthPort, "health-port", envOrDefaultInt("REP_GATEWAY_HEALTH_PORT", 0), "Separate health check port (0 = same as main)")
-	sessionTTL := fs.String("session-key-ttl", envOrDefault("REP_GATEWAY_SESSION_KEY_TTL", "30s"), "Session key TTL")
-	fs.IntVar(&cfg.SessionKeyMaxRate, "session-key-max-rate", envOrDefaultInt("REP_GATEWAY_SESSION_KEY_MAX_RATE", 10), "Session key max requests/min/IP")
+	sessionTTL := fs.String("session-key-ttl", envOrDefault("REP_GATEWAY_SESSION_KEY_TTL", defaultSessionTTL), "Session key TTL")
+	fs.IntVar(&cfg.SessionKeyMaxRate, "session-key-max-rate", envOrDefaultInt("REP_GATEWAY_SESSION_KEY_MAX_RATE", defaultSessionMaxRate), "Session key max requests/min/IP")
 	fs.BoolVar(&cfg.ShowVersion, "version", false, "Print version and exit")
 
 	if err := fs.Parse(args); err != nil {
@@ -147,6 +195,23 @@ func Parse(args []string, version string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// prescanManifestFlag scans args for --manifest or -manifest (flag or flag=value form)
+// without going through the full flag.FlagSet (which would reject unknown flags).
+func prescanManifestFlag(args []string) string {
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		for _, prefix := range []string{"--manifest=", "-manifest="} {
+			if strings.HasPrefix(arg, prefix) {
+				return strings.TrimPrefix(arg, prefix)
+			}
+		}
+		if (arg == "--manifest" || arg == "-manifest") && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
 }
 
 // envOrDefault returns the value of the environment variable or the default.

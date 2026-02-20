@@ -68,7 +68,9 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !isHTML(contentType) {
 		// Not HTML — write the response as-is.
 		w.WriteHeader(rec.statusCode)
-		w.Write(rec.body.Bytes())
+		if _, err := w.Write(rec.body.Bytes()); err != nil {
+			m.logger.Debug("rep.inject.write_error", "path", r.URL.Path, "error", err)
+		}
 		return
 	}
 
@@ -84,7 +86,9 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				"reason", "unsupported Content-Encoding: "+encoding,
 			)
 			w.WriteHeader(rec.statusCode)
-			w.Write(body)
+			if _, err := w.Write(body); err != nil {
+				m.logger.Debug("rep.inject.write_error", "path", r.URL.Path, "error", err)
+			}
 			return
 		}
 		body = decompressed
@@ -106,7 +110,9 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Del("Content-Encoding")
 
 	w.WriteHeader(rec.statusCode)
-	w.Write(injected)
+	if _, err := w.Write(injected); err != nil {
+		m.logger.Debug("rep.inject.write_error", "path", r.URL.Path, "error", err)
+	}
 
 	m.logger.Debug("rep.inject.html",
 		"path", r.URL.Path,
@@ -124,7 +130,7 @@ func decompressBody(body []byte, encoding string) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer reader.Close()
+		defer func() { _ = reader.Close() }()
 		return io.ReadAll(reader)
 	case "identity", "":
 		return body, nil
@@ -185,8 +191,8 @@ func isHTML(contentType string) bool {
 // responseRecorder captures the upstream response for inspection.
 type responseRecorder struct {
 	http.ResponseWriter
-	body       *bytes.Buffer
-	statusCode int
+	body        *bytes.Buffer
+	statusCode  int
 	wroteHeader bool
 }
 
