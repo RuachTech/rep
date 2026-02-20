@@ -1,4 +1,4 @@
-import { meta } from '@rep-protocol/sdk';
+import { meta, getAll } from '@rep-protocol/sdk';
 import { useRep, useRepSecure } from '@rep-protocol/react';
 
 /**
@@ -60,6 +60,24 @@ export function RepConfigPanel() {
                   }}>{analyticsKey}</code>
           }
         />
+      </Section>
+
+      {/* ── getAll() debug ────────────────────────────────────────── */}
+      <Section label="getAll() dump" sublabel="raw public vars the SDK sees — useful for debugging">
+        {(() => {
+          const all = getAll();
+          const keys = Object.keys(all);
+          if (keys.length === 0) {
+            return (
+              <tr>
+                <td colSpan={2} style={{ padding: '0.2rem 0', color: '#dc2626', fontSize: '0.8rem' }}>
+                  empty — SDK found no public variables
+                </td>
+              </tr>
+            );
+          }
+          return keys.map((k) => <Row key={k} name={k} value={all[k]} />);
+        })()}
       </Section>
 
       {/* ── Payload metadata ─────────────────────────────────────── */}
