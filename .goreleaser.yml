@@ -6,13 +6,9 @@ version: 2
 
 project_name: rep-gateway
 
-# Monorepo: Go source is in gateway/, tags are prefixed with gateway/
-monorepo:
-  tag_prefix: "gateway/"
-  dir: gateway
-
 builds:
   - id: rep-gateway
+    dir: gateway
     main: ./cmd/rep-gateway
     binary: rep-gateway
     env:
@@ -20,6 +16,7 @@ builds:
     goos:
       - linux
       - darwin
+      - windows
     goarch:
       - amd64
       - arm64
@@ -30,7 +27,12 @@ builds:
 
 archives:
   - id: default
-    format: tar.gz
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE

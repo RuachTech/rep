@@ -9,7 +9,8 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 const GATEWAY_BIN_DIR = path.join(__dirname, '../bin/gateway');
-const GATEWAY_BIN_PATH = path.join(GATEWAY_BIN_DIR, 'rep-gateway');
+const GATEWAY_BIN_NAME = process.platform === 'win32' ? 'rep-gateway.exe' : 'rep-gateway';
+const GATEWAY_BIN_PATH = path.join(GATEWAY_BIN_DIR, GATEWAY_BIN_NAME);
 
 function detectPlatform() {
   const platform = process.platform;
@@ -39,8 +40,9 @@ function detectPlatform() {
 
 function findLocalGatewayBinary() {
   // Try to find a locally built gateway binary (for development)
+  const binName = process.platform === 'win32' ? 'rep-gateway.exe' : 'rep-gateway';
   const localPaths = [
-    path.join(__dirname, '../../gateway/bin/rep-gateway'),
+    path.join(__dirname, '../../gateway/bin/', binName),
     path.join(__dirname, '../../gateway/bin/rep-gateway-' + process.platform + '-' + process.arch),
   ];
   

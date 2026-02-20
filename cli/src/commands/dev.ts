@@ -13,7 +13,8 @@ import * as dotenv from 'dotenv';
  * Get the default path to the bundled gateway binary.
  */
 function getBundledGatewayPath(): string {
-  return path.join(__dirname, '../../bin/gateway/rep-gateway');
+  const binName = process.platform === 'win32' ? 'rep-gateway.exe' : 'rep-gateway';
+  return path.join(__dirname, '../../bin/gateway', binName);
 }
 
 /**
