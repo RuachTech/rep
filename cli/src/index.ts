@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
  * REP CLI - Command-line tool for the Runtime Environment Protocol.
- * Per TASKS.md P4.
  */
 
 import { Command } from 'commander';

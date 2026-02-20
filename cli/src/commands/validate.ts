@@ -1,6 +1,6 @@
 /**
  * Validate command - validates a .rep.yaml manifest file.
- * Per REP-RFC-0001 §6 and TASKS.md P4.
+ * Per REP-RFC-0001 §6.
  */
 
 import { Command } from 'commander';

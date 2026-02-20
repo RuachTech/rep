@@ -1,6 +1,6 @@
 /**
  * Lint command - scans built bundles for accidentally leaked secrets.
- * Per REP-RFC-0001 §3.3 and TASKS.md P4.
+ * Per REP-RFC-0001 §3.3.
  */
 
 import { Command } from 'commander';

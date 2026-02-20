@@ -1,6 +1,6 @@
 /**
  * Typegen command - generates TypeScript type definitions from manifest.
- * Per REP-RFC-0001 §5.4 and TASKS.md P4.
+ * Per REP-RFC-0001 §5.4
  */
 
 import { Command } from 'commander';

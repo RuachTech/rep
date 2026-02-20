@@ -62,11 +62,72 @@ rep/
 ├── schema/
 │   ├── rep-manifest.schema.json # JSON Schema for .rep.yaml manifest
 │   └── rep-payload.schema.json  # JSON Schema for injected payload
+├── gateway/                     # Go implementation of REP gateway
+├── sdk/                         # @rep-protocol/sdk (TypeScript)
+├── cli/                         # @rep-protocol/cli (TypeScript)
+├── adapters/                    # Framework adapters (React, Vue, Svelte)
+├── codemod/                     # @rep-protocol/codemod (migration tool)
 └── examples/
     ├── nginx-basic/             # Minimal nginx + REP gateway
     ├── caddy-basic/             # Minimal caddy + REP gateway
     └── kubernetes/              # K8s deployment with ConfigMap hot reload
 ```
+
+## Development Setup
+
+This project uses **pnpm workspaces** for managing the monorepo. All TypeScript packages (SDK, CLI, adapters, codemod) are managed as workspace packages with efficient dependency hoisting.
+
+### Prerequisites
+
+- **Node.js** >= 20.0.0
+- **pnpm** >= 8.0.0 (install via `npm install -g pnpm`)
+- **Go** >= 1.22 (for gateway development)
+
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/ruachtech/rep.git
+cd rep
+
+# Install all workspace dependencies
+pnpm install
+
+# Build all packages
+pnpm run build
+
+# Run tests across all packages
+pnpm run test
+```
+
+### Workspace Commands
+
+```bash
+# Build a specific package
+pnpm --filter @rep-protocol/sdk run build
+pnpm --filter @rep-protocol/cli run build
+
+# Run SDK in watch mode
+pnpm run dev:sdk
+
+# Run CLI in watch mode
+pnpm run dev:cli
+
+# Run tests for a specific package
+pnpm --filter @rep-protocol/sdk run test
+
+# Clean all build artifacts
+pnpm run clean
+```
+
+### Package Dependencies
+
+The workspace is configured so that:
+- All adapters (`@rep-protocol/react`, `@rep-protocol/vue`, `@rep-protocol/svelte`) depend on `@rep-protocol/sdk` via `workspace:*` protocol
+- Shared dev dependencies (`typescript`, `vitest`, `tsup`) are hoisted to the root
+- Each package maintains its own production dependencies
+
+**Note:** This project uses pnpm exclusively. `package-lock.json` and `yarn.lock` files are ignored. Always use `pnpm install` instead of `npm install`.
 
 ## Quick Start (Conceptual)
 

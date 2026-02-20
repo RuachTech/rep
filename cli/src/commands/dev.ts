@@ -1,6 +1,5 @@
 /**
  * Dev command - local development server wrapping the gateway binary.
- * Per TASKS.md P4.
  */
 
 import { Command } from 'commander';

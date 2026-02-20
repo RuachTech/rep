@@ -19,6 +19,11 @@ _test/
 **/*.tsbuildinfo
 **/coverage/
 
+# Package manager lock files (keep pnpm-lock.yaml, ignore npm/yarn)
+package-lock.json
+yarn.lock
+.pnpm-debug.log
+
 # ─── Build artefacts ──────────────────────────────────────────────────────────
 **/build/
 **/out/
