@@ -1,4 +1,4 @@
-# CLAUDE.md — Agent Handover for REP (Runtime Environment Protocol)
+# CLAUDE.md — Agent context for REP (Runtime Environment Protocol)
 
 ## Project Identity
 
@@ -63,6 +63,7 @@ The Parcel GitHub issue #4049 explicitly states: "sensitive environment variable
 ```
 rep/
 ├── CLAUDE.md                          # THIS FILE — agent handover
+├── TASKS.md                           # Task tracker (P1–P5 priorities)
 ├── LICENSE                            # CC BY 4.0 (spec) + Apache 2.0 (code)
 ├── README.md                          # Project overview, quick start, positioning
 │
@@ -80,37 +81,55 @@ rep/
 │
 ├── gateway/                           # Go reference implementation
 │   ├── README.md                      # Gateway-specific docs
+│   ├── VERSION                        # Contains "0.1.0" — referenced by Makefile + Dockerfile
 │   ├── Dockerfile                     # Multi-stage, FROM scratch final image
 │   ├── Makefile                       # build, test, docker, cross-compile targets
 │   ├── go.mod                         # Module: github.com/ruach-tech/rep/gateway (Go 1.22, zero deps)
+│   ├── go.sum                         # Module checksum file
 │   ├── cmd/rep-gateway/
 │   │   └── main.go                    # Entrypoint: flag parsing, signal handling, graceful shutdown
 │   ├── internal/
 │   │   ├── config/
 │   │   │   ├── config.go              # CLI flag + env var parsing (REP_GATEWAY_* namespace)
-│   │   │   └── classify.go            # Core classifier: reads REP_* vars → PUBLIC/SENSITIVE/SERVER
+│   │   │   ├── config_test.go         # Flag parsing, env overrides, precedence, validation
+│   │   │   ├── classify.go            # Core classifier: reads REP_* vars → PUBLIC/SENSITIVE/SERVER
+│   │   │   └── classify_test.go       # Prefix stripping, tier assignment, collision detection
 │   │   ├── crypto/
 │   │   │   ├── crypto.go              # AES-256-GCM encryption, HMAC-SHA256 integrity, SRI hash
-│   │   │   └── session_key.go         # /rep/session-key endpoint: rate limiting, single-use, CORS
+│   │   │   ├── crypto_test.go         # Encrypt/decrypt roundtrip, wrong key/AAD, HMAC, SRI, canonicalize
+│   │   │   ├── session_key.go         # /rep/session-key endpoint: rate limiting, single-use, CORS
+│   │   │   └── session_key_test.go    # Success, CORS, rate limiting, method rejection, IP extraction
 │   │   ├── guardrails/
-│   │   │   └── guardrails.go          # Secret detection: entropy, known formats (AWS, JWT, GitHub, Stripe, etc.)
+│   │   │   ├── guardrails.go          # Secret detection: entropy, known formats (AWS, JWT, GitHub, Stripe, etc.)
+│   │   │   └── guardrails_test.go     # Known formats, entropy, length anomaly, false positive avoidance
 │   │   ├── health/
-│   │   │   └── health.go              # /rep/health endpoint: variable counts, guardrail status, uptime
+│   │   │   ├── health.go              # /rep/health endpoint: variable counts, guardrail status, uptime
+│   │   │   └── health_test.go         # JSON shape, variable counts, uptime, guardrail warnings
 │   │   ├── hotreload/
-│   │   │   └── hotreload.go           # /rep/changes SSE hub: broadcasts config deltas to clients
+│   │   │   ├── hotreload.go           # /rep/changes SSE hub: broadcasts config deltas to clients
+│   │   │   └── hotreload_test.go      # Broadcast, unsubscribe, client count, SSE headers/events
 │   │   ├── inject/
-│   │   │   └── inject.go              # HTML injection middleware: intercepts text/html, injects before </head>
+│   │   │   ├── inject.go              # HTML injection middleware: mutex-protected, compression-aware
+│   │   │   └── inject_test.go         # Injection positions, middleware, concurrent safety, decompression
 │   │   └── server/
-│   │       └── server.go              # Server orchestrator: startup sequence, proxy/embedded modes, reload
-│   └── pkg/payload/
-│       └── payload.go                 # Payload builder: constructs JSON, renders <script> tag
+│   │       ├── server.go              # Server orchestrator: startup sequence, proxy/embedded modes, reload
+│   │       └── server_test.go         # Integration: health, injection, session key endpoints
+│   ├── pkg/payload/
+│   │   ├── payload.go                 # Payload builder: constructs JSON, renders <script> tag
+│   │   └── payload_test.go            # Build, script tag format, JSON validity, integrity format
+│   └── testdata/
+│       └── static/
+│           └── index.html             # Minimal HTML test page for make run-example
 │
 └── sdk/                               # TypeScript client SDK
     ├── README.md                      # SDK-specific docs
     ├── package.json                   # @rep-protocol/sdk, zero runtime deps, tsup build
     ├── tsconfig.json                  # ES2020, strict, DOM lib
+    ├── vitest.config.ts               # Vitest config: jsdom environment, globals
     └── src/
-        └── index.ts                   # Full SDK: get(), getSecure(), onChange(), verify(), meta()
+        ├── index.ts                   # Full SDK: get(), getSecure(), onChange(), verify(), meta()
+        └── __tests__/
+            └── index.test.ts          # 24 tests: get, getSecure, verify, meta, onChange, exports
 ```
 
 ---
@@ -207,6 +226,8 @@ Full threat analysis with 7 specific threats, mitigations, and honest residual r
 |---|---|
 | **Go for the gateway** | Static compilation (CGO_ENABLED=0), zero runtime deps, ~3MB binary, `FROM scratch` compatible. No Node.js or bash needed in prod. |
 | **Zero external Go dependencies** | Minimises supply chain risk. Only uses stdlib + crypto packages. **Open question:** manifest loading (§6) requires YAML parsing. Options: (a) roll a minimal YAML subset parser in ~200 lines, (b) accept a single vendored file under Apache 2.0/MIT, (c) add `gopkg.in/yaml.v3` as a justified exception, or (d) support JSON as an alternative manifest format. The tradeoff is supply chain purity vs implementation cost. Decision needed before `--manifest` is implemented. |
+| **`pkg/payload` imports from `internal/`** | This is valid Go. The `internal/` rule restricts imports from outside the parent directory tree. Since both `pkg/` and `internal/` live under `gateway/`, the import is allowed. No type extraction to `pkg/types/` is needed. |
+| **`inject.go` strips `Accept-Encoding`** | The injection middleware removes `Accept-Encoding` from proxied requests so upstreams always respond with identity encoding. This avoids needing to decompress/recompress to inject the `<script>` tag. A gzip fallback via `compress/gzip` (stdlib) handles non-compliant upstreams. Brotli is unsupported (no stdlib support, zero-dep constraint) — logged and passed through uninjected. |
 | **`type="application/json"` on script tag** | Browser does NOT execute it. Inert data. No CSP conflicts. |
 | **`id="__rep__"` for discovery** | Stable, predictable selector. SDK finds it synchronously. |
 | **Synchronous `get()`, async `getSecure()`** | Public vars must be available instantly (no loading states, no Suspense). Sensitive vars accept one network call. |
@@ -232,42 +253,30 @@ Full threat analysis with 7 specific threats, mitigations, and honest residual r
 - [x] TypeScript SDK source — full API per spec
 - [x] Dockerfile (multi-stage, FROM scratch)
 - [x] Makefile with build/test/docker/cross-compile targets
+- [x] Go unit tests for all 8 packages (config, crypto, guardrails, health, hotreload, inject, server, payload) — all pass with `-race`
+- [x] TypeScript SDK tests — 24 tests via vitest + jsdom (get, getSecure, verify, meta, onChange, exports)
+- [x] `gateway/VERSION` file (`0.1.0`)
+- [x] `gateway/testdata/static/index.html` for `make run-example`
+- [x] `go.sum` generated via `go mod tidy`
+- [x] `inject.go` — `sync.RWMutex` added to `Middleware` for concurrent safety during hot reload
+- [x] `inject.go` — compressed upstream handling: strips `Accept-Encoding` from proxied requests + gzip decompression fallback via stdlib
+- [x] `getSecure()` error handling verified — throws `REPError` for missing payload, missing sensitive blob, and fetch failures (covered by SDK tests)
+
+### Important Findings (Resolved)
+
+- **`pkg/payload` importing `internal/config` is VALID.** Go's `internal/` rule allows imports from any package under the same parent directory. Both `pkg/` and `internal/` are under `gateway/`, so no refactoring needed.
+- **Gateway compiles as-is with zero dependencies.** No compilation issues found — `orderedMap`, `responseRecorder`, and all types compile correctly.
 
 ### Needs Doing 🔲
 
-#### Priority 1: Make It Compile & Pass Tests
-
-- [ ] **Write unit tests for every package** — the Go code has no tests yet. Key areas:
-  - `config/classify_test.go` — test classification, prefix stripping, collision detection
-  - `crypto/crypto_test.go` — test encrypt/decrypt roundtrip, HMAC computation, SRI hash
-  - `guardrails/guardrails_test.go` — test entropy calculation, known format detection, thresholds
-  - `inject/inject_test.go` — test HTML injection (before `</head>`, after `<head>`, fallback)
-  - `health/health_test.go` — test JSON response format
-  - `pkg/payload/payload_test.go` — test payload build, script tag rendering
-  - `server/server_test.go` — integration test with httptest
-- [ ] **Write SDK tests** — `sdk/src/__tests__/index.test.ts` using vitest with JSDOM
-- [ ] **Fix any compilation issues** — the code was written without a Go compiler available. Likely issues:
-  - The `orderedMap` type in `crypto.go` uses a function-style constructor but Go doesn't have constructors — verify this compiles
-  - Check that the `payload.go` import of `internal/config` from `pkg/payload` is valid (it's crossing the internal boundary — may need to move types to `pkg/`)
-  - Verify `responseRecorder` in `inject.go` satisfies `http.ResponseWriter` interface fully
-- [ ] **Add `go.sum`** — run `go mod tidy` after first successful build
-
 #### Priority 2: Structural Issues
 
-- [ ] **Move shared types to `pkg/`** — `config.ClassifiedVars` is used by `pkg/payload` but lives in `internal/config`. This crosses the Go `internal` boundary. Either:
-  - Move `ClassifiedVars`, `Variable`, `Tier` types to a new `pkg/types/types.go`
-  - Or restructure so `payload` doesn't need to import `internal/config`
-- [ ] **Add VERSION file** — the Dockerfile references `cat VERSION` but no VERSION file exists. Create `gateway/VERSION` containing `0.1.0`
 - [ ] **Add `.gitignore`** — standard Go + Node ignores (bin/, dist/, node_modules/, coverage.*, *.out)
-- [ ] **Add testdata** — the Makefile `run-example` target references `./testdata/static`. Create `gateway/testdata/static/index.html` with a minimal HTML file
 
-#### Priority 3: Robustness & Edge Cases
+#### Priority 3: Robustness & Edge Cases (items NOT yet addressed)
 
-- [ ] **Handle compressed upstream responses** — the `inject.go` `responseRecorder` captures raw bytes, but if the upstream sends gzip/brotli compressed HTML, the injection will fail. Need to decompress, inject, re-compress (or strip Accept-Encoding from proxy requests).
 - [ ] **Handle chunked transfer encoding** — the recorder buffers the entire response. Consider streaming for large non-HTML responses (pass through without buffering).
 - [ ] **Session key endpoint: use derived keys, not raw encryption key** — currently `session_key.go` sends the actual AES encryption key to the client. In production, this should use HKDF to derive a per-session key, or use key wrapping (AES-KW).
-- [ ] **Graceful handling of missing sensitive blob in SDK** — verify `getSecure()` errors cleanly when `_payload.sensitive` is empty string vs undefined vs missing
-- [ ] **Concurrent access safety** — `inject.go`'s `UpdateScriptTag()` mutates `m.scriptTag` without locking. Add a `sync.RWMutex`.
 
 #### Priority 4: Developer Experience
 
@@ -306,12 +315,28 @@ Full threat analysis with 7 specific threats, mitigations, and honest residual r
 - **Error wrapping with `fmt.Errorf("context: %w", err)`.** Always add context to errors.
 - **No `init()` functions except where strictly necessary.** The gateway's lifecycle is explicit.
 
+### Go (Testing)
+
+- **All tests use stdlib only** (`testing`, `net/http/httptest`). No testify or third-party test frameworks.
+- **Use `t.Setenv()` for env var tests.** Auto-cleans on test completion. Do NOT use `os.Setenv`/`os.Unsetenv` directly — it breaks `t.Setenv` cleanup.
+- **Server integration tests build the mux directly** rather than going through `server.New()` to avoid env var pollution. See `server_test.go:buildTestMux()`.
+- **Run with `-race` flag.** The inject middleware has concurrent access patterns that must be validated.
+- **`clearREPEnv()` helper in `classify_test.go`** removes stale REP_* vars from the process environment for clean test isolation.
+
 ### TypeScript (SDK)
 
-- **Zero runtime dependencies.** The `package.json` only has devDependencies (tsup, typescript, vitest).
+- **Zero runtime dependencies.** The `package.json` only has devDependencies (tsup, typescript, vitest, jsdom).
 - **Module-scoped state with underscore prefix.** `_payload`, `_available`, `_tampered`.
 - **Synchronous init, lazy async.** SDK reads the DOM synchronously on import. SSE connects lazily on first `onChange()` call.
 - **Named export + default namespace.** Both `import { get } from '@rep-protocol/sdk'` and `import { rep } from '@rep-protocol/sdk'` work.
+
+### TypeScript (Testing)
+
+- **Vitest + jsdom.** Config in `sdk/vitest.config.ts` sets `environment: 'jsdom'` and `globals: true`.
+- **`vi.resetModules()` before each test.** The SDK's `_init()` runs on module load, so each test must reset module cache and use dynamic `import('../index')` to get a fresh SDK instance.
+- **DOM cleanup in `beforeEach`.** Clear `document.head` and `document.body` before each test to remove injected `<script>` elements.
+- **Mock `EventSource` for hot reload tests.** Use `vi.stubGlobal('EventSource', vi.fn(() => mockES))` since jsdom doesn't provide `EventSource`.
+- **Mock `fetch` for `getSecure()` tests.** Use `vi.stubGlobal('fetch', fetchMock)` to test session key fetch failures without a real server.
 
 ### Documentation
 
@@ -366,12 +391,15 @@ make build-linux            # Cross-compile for Linux amd64
 make docker                 # Build Docker image
 make test                   # Run all tests
 make run-example            # Run locally with example env vars
+go test -race ./...         # Run all tests with race detector (recommended)
+go test -race -count=1 ./...  # Same, bypassing cache
 
 # SDK
 cd sdk
-npm install
+npm install                 # Also installs jsdom (devDep for vitest)
 npm run build               # Build CJS + ESM + types → dist/
-npm test                    # Run vitest
+npm test                    # Run vitest (24 tests, jsdom environment)
+npm run test:watch          # Run vitest in watch mode
 ```
 
 ---
