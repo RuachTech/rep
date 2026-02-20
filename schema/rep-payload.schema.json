@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rep-protocol.dev/schema/rep-payload.schema.json",
+  "title": "REP Payload",
+  "description": "JSON schema for the Runtime Environment Protocol payload injected into HTML documents by the REP gateway.",
+  "type": "object",
+  "required": ["public", "_meta"],
+  "additionalProperties": false,
+  "properties": {
+    "public": {
+      "type": "object",
+      "description": "Public tier variables. All values are strings. Keys are variable names with the REP_PUBLIC_ prefix stripped.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "sensitive": {
+      "type": "string",
+      "description": "Base64-encoded AES-256-GCM encrypted blob containing sensitive tier variables. Structure: [12-byte nonce][ciphertext][16-byte auth tag]. Plaintext is a JSON object of key-value string pairs. Present only if REP_SENSITIVE_* variables exist.",
+      "pattern": "^[A-Za-z0-9+/]+=*$"
+    },
+    "_meta": {
+      "type": "object",
+      "description": "Metadata about the injected payload.",
+      "required": ["version", "injected_at", "integrity"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string",
+          "description": "REP protocol version (semver).",
+          "pattern": "^\\d+\\.\\d+\\.\\d+$",
+          "examples": ["0.1.0"]
+        },
+        "injected_at": {
+          "type": "string",
+          "description": "ISO 8601 timestamp of when the payload was injected into the HTML response.",
+          "format": "date-time"
+        },
+        "integrity": {
+          "type": "string",
+          "description": "HMAC-SHA256 signature over canonicalize(public). canonicalize() produces a deterministic JSON representation with sorted keys and no whitespace. The same value is used as the AES-GCM AAD when encrypting the sensitive blob, binding the ciphertext to the public variable set. Format: 'hmac-sha256:{base64_signature}'.",
+          "pattern": "^hmac-sha256:.+$"
+        },
+        "key_endpoint": {
+          "type": "string",
+          "description": "Relative URL for the session key endpoint. Present only if sensitive tier variables exist.",
+          "examples": ["/rep/session-key"]
+        },
+        "hot_reload": {
+          "type": "string",
+          "description": "Relative URL for the hot reload SSE endpoint. Present only if hot reload is enabled on the gateway.",
+          "examples": ["/rep/changes"]
+        },
+        "ttl": {
+          "type": "integer",
+          "description": "Seconds until the payload should be considered stale. 0 means no automatic expiry.",
+          "minimum": 0,
+          "default": 0
+        }
+      }
+    }
+  }
+}

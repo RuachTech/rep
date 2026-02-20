@@ -1,0 +1,51 @@
+# ─── Go (gateway) ─────────────────────────────────────────────────────────────
+gateway/bin/
+*.out
+*.test
+coverage.*
+*.prof
+*.pprof
+*.cgo1.go
+*.cgo2.c
+_cgo_defun.c
+_cgo_gotypes.go
+_cgo_export.*
+_obj/
+_test/
+
+# ─── Node / TypeScript (sdk, cli) ─────────────────────────────────────────────
+**/node_modules/
+**/dist/
+**/*.tsbuildinfo
+**/coverage/
+
+# ─── Build artefacts ──────────────────────────────────────────────────────────
+**/build/
+**/out/
+
+# ─── Environment files ────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.env.local
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ─── Editors / IDEs ───────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# ─── Test and coverage outputs ────────────────────────────────────────────────
+gateway/coverage.out
+gateway/coverage.html
+sdk/coverage/
