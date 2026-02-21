@@ -39,7 +39,6 @@ interface REPMeta {
 interface SessionKeyResponse {
   key: string;
   expires_at: string;
-  nonce: string;
 }
 
 type ChangeCallback = (newValue: string, oldValue: string | undefined) => void;

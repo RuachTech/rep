@@ -215,14 +215,12 @@ This endpoint issues short-lived decryption keys for `SENSITIVE` tier variables.
 ```json
 {
   "key": "{base64_encoded_derived_aes_key}",
-  "expires_at": "2026-02-18T14:30:30.000Z",
-  "nonce": "{base64_encoded_nonce}"
+  "expires_at": "2026-02-18T14:30:30.000Z"
 }
 ```
 
 - **`key`**: The HKDF-derived AES-256 encryption key (see §8.2), base64-encoded. This is the derived key, not the master key material.
 - **`expires_at`**: RFC 3339 timestamp indicating when this key issuance expires.
-- **`nonce`**: A 16-byte cryptographically random value, base64-encoded, generated fresh per request. Ensures each response is unique even within the same key's TTL window.
 
 **Security constraints:**
 - Keys MUST expire within 30 seconds of issuance.
