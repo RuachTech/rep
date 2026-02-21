@@ -5,6 +5,10 @@
   "bin": {
     "rep-codemod": "./bin/rep-codemod.js"
   },
+  "files": [
+    "dist",
+    "bin"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run"
