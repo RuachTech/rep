@@ -185,6 +185,9 @@ jobs:
           echo "tag=${TAG#gateway/}" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#gateway/v}" >> "$GITHUB_OUTPUT"
 
+      - name: Copy LICENSE into gateway dir
+        run: cp LICENSE gateway/LICENSE
+
       - name: Create local tag for GoReleaser validation
         # GoReleaser requires GORELEASER_CURRENT_TAG to exist as a real git tag.
         # release-please creates gateway/vX.Y.Z; we alias it locally as vX.Y.Z.
