@@ -58,7 +58,7 @@ func New(cfg *config.Config, logger *slog.Logger, version string) (*Server, erro
 
 	// Step 1–2: Read and classify environment variables.
 	logger.Info("reading environment variables")
-	vars, err := config.ReadAndClassify()
+	vars, err := config.ReadAndClassify(cfg.EnvFile)
 	if err != nil {
 		return nil, fmt.Errorf("classifying variables: %w", err)
 	}
@@ -238,6 +238,13 @@ func (s *Server) Start(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		s.logger.Info("shutting down gateway")
+
+		// Close SSE connections first so their handlers return and
+		// httpServer.Shutdown() doesn't block waiting for them.
+		if s.hotReloadHub != nil {
+			s.hotReloadHub.Close()
+		}
+
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
@@ -253,12 +260,18 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 }
 
+// fileWatchDefaultInterval is the default stat frequency for file_watch mode.
+// This is deliberately shorter than the poll mode default (30s) because
+// stat-polling a single file is cheap and dev workflows expect fast feedback.
+const fileWatchDefaultInterval = 2 * time.Second
+
 // runFileWatcher runs a background goroutine that watches a file for mtime
 // changes and triggers Reload() when a change is detected.
 // This implements the "file_watch" hot reload mode (REP-RFC-0001 §4.6).
 //
-// The ticker interval defaults to the configured PollInterval (used as the
-// stat frequency); a 5-second fallback is applied when the interval is zero.
+// The stat frequency uses --poll-interval if explicitly set to a value
+// different from the poll-mode default (30s); otherwise it falls back to
+// fileWatchDefaultInterval (2s).
 func (s *Server) runFileWatcher(ctx context.Context) {
 	path := s.cfg.WatchPath
 	if path == "" {
@@ -267,8 +280,8 @@ func (s *Server) runFileWatcher(ctx context.Context) {
 	}
 
 	interval := s.cfg.PollInterval
-	if interval <= 0 {
-		interval = 5 * time.Second
+	if interval <= 0 || interval == 30*time.Second {
+		interval = fileWatchDefaultInterval
 	}
 
 	// Record the initial mtime.
@@ -326,7 +339,7 @@ func (s *Server) runPoller(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			newVars, err := config.ReadAndClassify()
+			newVars, err := config.ReadAndClassify(s.cfg.EnvFile)
 			if err != nil {
 				s.logger.Error("rep.hotreload.poll.classify_error", "error", err)
 				continue
@@ -372,7 +385,7 @@ func (s *Server) Reload() error {
 	s.logger.Info("reloading configuration")
 
 	// Re-read and classify.
-	vars, err := config.ReadAndClassify()
+	vars, err := config.ReadAndClassify(s.cfg.EnvFile)
 	if err != nil {
 		return fmt.Errorf("re-classifying variables: %w", err)
 	}

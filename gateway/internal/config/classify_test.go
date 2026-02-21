@@ -28,7 +28,7 @@ func TestReadAndClassify_PublicVars(t *testing.T) {
 	clearREPEnv(t)
 	t.Setenv("REP_PUBLIC_API_URL", "https://api.example.com")
 
-	vars, err := ReadAndClassify()
+	vars, err := ReadAndClassify("")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -54,7 +54,7 @@ func TestReadAndClassify_SensitiveVars(t *testing.T) {
 	clearREPEnv(t)
 	t.Setenv("REP_SENSITIVE_ANALYTICS_KEY", "UA-12345")
 
-	vars, err := ReadAndClassify()
+	vars, err := ReadAndClassify("")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestReadAndClassify_ServerVars(t *testing.T) {
 	clearREPEnv(t)
 	t.Setenv("REP_SERVER_DB_PASSWORD", "s3cret")
 
-	vars, err := ReadAndClassify()
+	vars, err := ReadAndClassify("")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestReadAndClassify_PrefixStripping(t *testing.T) {
 	clearREPEnv(t)
 	t.Setenv("REP_PUBLIC_FEATURE_FLAGS", "dark-mode,beta")
 
-	vars, err := ReadAndClassify()
+	vars, err := ReadAndClassify("")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestReadAndClassify_IgnoresGatewayVars(t *testing.T) {
 	t.Setenv("REP_GATEWAY_PORT", "9090")
 	t.Setenv("REP_GATEWAY_MODE", "embedded")
 
-	vars, err := ReadAndClassify()
+	vars, err := ReadAndClassify("")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestReadAndClassify_IgnoresNonREPVars(t *testing.T) {
 	clearREPEnv(t)
 	// PATH and HOME should always be set but should be ignored.
 
-	vars, err := ReadAndClassify()
+	vars, err := ReadAndClassify("")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -143,7 +143,7 @@ func TestReadAndClassify_NameCollision(t *testing.T) {
 	t.Setenv("REP_PUBLIC_FOO", "a")
 	t.Setenv("REP_SENSITIVE_FOO", "b")
 
-	_, err := ReadAndClassify()
+	_, err := ReadAndClassify("")
 	if err == nil {
 		t.Fatal("expected collision error, got nil")
 	}
@@ -153,7 +153,7 @@ func TestReadAndClassify_IgnoresUnknownREPPrefix(t *testing.T) {
 	clearREPEnv(t)
 	t.Setenv("REP_CUSTOM_FOO", "bar")
 
-	vars, err := ReadAndClassify()
+	vars, err := ReadAndClassify("")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestReadAndClassify_MultipleVars(t *testing.T) {
 	t.Setenv("REP_SENSITIVE_KEY", "secret")
 	t.Setenv("REP_SERVER_DB", "dbpass")
 
-	vars, err := ReadAndClassify()
+	vars, err := ReadAndClassify("")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

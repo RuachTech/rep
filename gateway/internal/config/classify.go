@@ -87,23 +87,45 @@ func (cv *ClassifiedVars) ServerMap() map[string]string {
 	return m
 }
 
-// ReadAndClassify reads all environment variables, filters for the REP_ prefix,
+// ReadAndClassify reads environment variables, filters for the REP_ prefix,
 // classifies them, strips prefixes, and validates uniqueness.
+//
+// When envFile is non-empty, the file is parsed first as a base layer.
+// Process environment variables (os.Environ) are then overlaid on top,
+// so real env vars always take precedence over the file.
 //
 // Per REP-RFC-0001 §3.2:
 //   - Only REP_* prefixed variables are read.
 //   - The classification prefix is stripped from the name.
 //   - Names MUST be unique across all tiers after stripping.
-func ReadAndClassify() (*ClassifiedVars, error) {
-	vars := &ClassifiedVars{}
-	seen := make(map[string]string) // name → original key (for collision detection)
+func ReadAndClassify(envFile string) (*ClassifiedVars, error) {
+	// Build a merged map: env file (base) + os.Environ() (override).
+	merged := make(map[string]string)
 
+	if envFile != "" {
+		fileVars, err := ParseEnvFile(envFile)
+		if err != nil {
+			return nil, fmt.Errorf("reading env file: %w", err)
+		}
+		for k, v := range fileVars {
+			merged[k] = v
+		}
+	}
+
+	// Process environment overrides file values.
 	for _, env := range os.Environ() {
 		key, value, ok := strings.Cut(env, "=")
 		if !ok {
 			continue
 		}
+		merged[key] = value
+	}
 
+	// Classify the merged set.
+	vars := &ClassifiedVars{}
+	seen := make(map[string]string) // name → original key (for collision detection)
+
+	for key, value := range merged {
 		// Skip non-REP variables.
 		if !strings.HasPrefix(key, "REP_") {
 			continue
@@ -129,8 +151,6 @@ func ReadAndClassify() (*ClassifiedVars, error) {
 			v.Name = strings.TrimPrefix(key, "REP_SERVER_")
 			v.Tier = TierServer
 		default:
-			// REP_ prefixed but doesn't match a known tier — skip with a warning.
-			// This covers things like REP_CUSTOM_FOO which don't fit the spec.
 			continue
 		}
 
