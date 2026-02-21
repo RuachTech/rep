@@ -6,7 +6,7 @@
 **Organisation:** Ruach Tech (`github.com/ruachtech`)
 **Author:** Olamide Adebayo
 **License:** Spec documents under CC BY 4.0, code under Apache 2.0
-**Status:** Draft specification + reference implementation (pre-release, not yet published)
+**Status:** Pre-release — all packages implemented, CI/CD in place, pending first public release
 
 ---
 
@@ -23,111 +23,111 @@ REP introduces:
 6. A **lightweight Go gateway binary** (~3–5MB, zero dependencies, `FROM scratch` compatible)
 7. A **zero-dependency TypeScript SDK** (~1.5KB gzipped) with synchronous access for public vars
 
-The positioning is: **"The missing security and standardisation layer for frontend runtime config"** — the first solution treating this as a security problem rather than just a convenience problem.
-
----
-
-## Why This Exists — The Problem
-
-Every modern frontend framework resolves environment variables at **build time** via static string replacement. The bundle is then plain JS/HTML/CSS — the browser has no concept of environment variables. This means:
-
-- **One Docker image per environment** — defeats "build once, deploy anywhere"
-- **Broken CI/CD promotion** — the tested artifact ≠ the deployed artifact
-- **Config changes require rebuilds** — even for a single URL change
-- **No security model** — every existing workaround dumps all vars as plaintext into `window.__ENV__`
-
-### Existing Solutions (All Insufficient)
-
-| Tool | Limitation |
-|---|---|
-| `envsubst` / `sed` on JS bundles | Fragile string replacement on minified code |
-| Fetch `/config.json` at init | Network dependency, loading delay, race conditions |
-| `window.__ENV__` via shell script | No standard, no security, requires bash in prod container |
-| `runtime-env-cra` | CRA-only, no security model |
-| `@beam-australia/react-env` | React/Next only, no security model |
-| `@import-meta-env/unplugin` | Most sophisticated — but it's a build-tool plugin, not runtime infrastructure. Framework-coupled. No security classification, no encryption, no integrity verification |
-| `vite-plugin-runtime-env` | Vite-specific, uses envsubst placeholders |
-
-**What none of them have:** Security classification, encrypted sensitive vars, integrity verification, secret leak detection, hot reload, standalone binary, formal spec. REP has all of these.
-
-### Competitive Research Summary
-
-The strongest existing competitor is `@import-meta-env/unplugin`. It is fundamentally a **build tool plugin** that modifies bundler behaviour. REP is **runtime infrastructure** that doesn't touch the build at all. They are complementary, not competing.
-
-The Parcel GitHub issue #4049 explicitly states: "sensitive environment variables are exposed to the frontend indiscriminately." This is the open wound REP addresses.
-
 ---
 
 ## File Structure
 
 ```
 rep/
-├── LICENSE                            # CC BY 4.0 (spec) + Apache 2.0 (code)
-├── README.md                          # Project overview, quick start, positioning
+├── .github/workflows/
+│   ├── gateway.yml                    # Go CI (vet, test, build)
+│   ├── sdk.yml                        # TypeScript packages CI
+│   └── release-sdk.yml                # Release workflow (npm + GoReleaser + Docker)
 │
-├── spec/                              # Specification documents
-│   ├── REP-RFC-0001.md                # The core protocol specification (14 sections)
-│   ├── SECURITY-MODEL.md              # Threat model, trust boundaries, 7 threat analyses
-│   └── INTEGRATION-GUIDE.md           # Framework patterns, CI/CD, K8s, migration checklist
+├── package.json                       # Monorepo root (pnpm 9.0.0, private)
+├── pnpm-workspace.yaml                # Workspace: sdk, cli, adapters/*, codemod, examples/*
+├── pnpm-lock.yaml
+├── release-please-config.json         # Release-please config for all packages
+├── .release-please-manifest.json      # Per-package version tracker
+├── .gitignore
+├── CONTRIBUTING.md
+├── README.md
+├── LICENSE
 │
-├── schema/                            # Machine-readable schemas
-│   ├── rep-payload.schema.json        # JSON Schema for the injected payload
-│   └── rep-manifest.schema.json       # JSON Schema for .rep.yaml manifest file
+├── spec/
+│   ├── REP-RFC-0001.md                # Core protocol specification (14 sections)
+│   ├── SECURITY-MODEL.md              # Threat model, 7 threat analyses
+│   └── INTEGRATION-GUIDE.md           # Framework patterns, CI/CD, K8s, migration
 │
-├── examples/
-│   └── .rep.yaml                      # Example manifest with all three tiers
+├── schema/
+│   ├── rep-payload.schema.json
+│   └── rep-manifest.schema.json
 │
-├── gateway/                           # Go reference implementation
-│   ├── README.md                      # Gateway-specific docs
-│   ├── VERSION                        # Contains "0.1.0" — referenced by Makefile + Dockerfile
-│   ├── Dockerfile                     # Multi-stage, FROM scratch final image
-│   ├── Makefile                       # build, test, docker, cross-compile targets
-│   ├── go.mod                         # Module: github.com/ruachtech/rep/gateway (Go 1.24, zero deps)
-│   ├── go.sum                         # Module checksum file
+├── gateway/                           # Go reference implementation (zero deps)
+│   ├── .goreleaser.yml                # Multi-platform release config
+│   ├── Dockerfile                     # Multi-stage, FROM scratch final
+│   ├── Makefile
+│   ├── VERSION                        # "0.1.0"
+│   ├── go.mod                         # Go 1.24.5, zero external deps
 │   ├── cmd/rep-gateway/
-│   │   └── main.go                    # Entrypoint: flag parsing, signal handling, graceful shutdown
+│   │   └── main.go                    # Entrypoint: flags, signals, graceful shutdown
 │   ├── internal/
 │   │   ├── config/
-│   │   │   ├── config.go              # CLI flag + env var parsing (REP_GATEWAY_* namespace)
-│   │   │   ├── config_test.go         # Flag parsing, env overrides, precedence, validation
-│   │   │   ├── classify.go            # Core classifier: reads REP_* vars → PUBLIC/SENSITIVE/SERVER
-│   │   │   └── classify_test.go       # Prefix stripping, tier assignment, collision detection
+│   │   │   ├── config.go              # CLI flag + env var parsing (REP_GATEWAY_*)
+│   │   │   ├── classify.go            # Reads REP_* vars → PUBLIC/SENSITIVE/SERVER
+│   │   │   ├── envfile.go             # .env file parsing
+│   │   │   └── *_test.go
 │   │   ├── crypto/
-│   │   │   ├── crypto.go              # AES-256-GCM encryption, HMAC-SHA256 integrity, SRI hash
-│   │   │   ├── crypto_test.go         # Encrypt/decrypt roundtrip, wrong key/AAD, HMAC, SRI, canonicalize
-│   │   │   ├── session_key.go         # /rep/session-key endpoint: rate limiting, single-use, CORS
-│   │   │   └── session_key_test.go    # Success, CORS, rate limiting, method rejection, IP extraction
+│   │   │   ├── crypto.go              # AES-256-GCM, HMAC-SHA256, SRI hash
+│   │   │   ├── session_key.go         # /rep/session-key: rate limiting, single-use, CORS
+│   │   │   └── *_test.go
 │   │   ├── guardrails/
-│   │   │   ├── guardrails.go          # Secret detection: entropy, known formats (AWS, JWT, GitHub, Stripe, etc.)
-│   │   │   └── guardrails_test.go     # Known formats, entropy, length anomaly, false positive avoidance
+│   │   │   ├── guardrails.go          # Secret detection: entropy, known formats
+│   │   │   └── guardrails_test.go
 │   │   ├── health/
-│   │   │   ├── health.go              # /rep/health endpoint: variable counts, guardrail status, uptime
-│   │   │   └── health_test.go         # JSON shape, variable counts, uptime, guardrail warnings
+│   │   │   ├── health.go              # /rep/health endpoint
+│   │   │   └── health_test.go
 │   │   ├── hotreload/
-│   │   │   ├── hotreload.go           # /rep/changes SSE hub: broadcasts config deltas to clients
-│   │   │   └── hotreload_test.go      # Broadcast, unsubscribe, client count, SSE headers/events
+│   │   │   ├── hotreload.go           # /rep/changes SSE hub
+│   │   │   └── hotreload_test.go
 │   │   ├── inject/
-│   │   │   ├── inject.go              # HTML injection middleware: mutex-protected, compression-aware
-│   │   │   └── inject_test.go         # Injection positions, middleware, concurrent safety, decompression
+│   │   │   ├── inject.go              # HTML injection middleware (mutex-protected, compression-aware)
+│   │   │   └── inject_test.go
+│   │   ├── manifest/
+│   │   │   ├── manifest.go            # Hand-rolled YAML subset parser (zero deps)
+│   │   │   └── manifest_test.go
 │   │   └── server/
-│   │       ├── server.go              # Server orchestrator: startup sequence, proxy/embedded modes, reload
-│   │       └── server_test.go         # Integration: health, injection, session key endpoints
+│   │       ├── server.go              # Orchestrator: startup, proxy/embedded modes, reload
+│   │       └── server_test.go
 │   ├── pkg/payload/
-│   │   ├── payload.go                 # Payload builder: constructs JSON, renders <script> tag
-│   │   └── payload_test.go            # Build, script tag format, JSON validity, integrity format
-│   └── testdata/
-│       └── static/
-│           └── index.html             # Minimal HTML test page for make run-example
+│   │   ├── payload.go                 # Payload builder: JSON + <script> tag
+│   │   └── payload_test.go
+│   └── testdata/static/
+│       └── index.html
 │
-└── sdk/                               # TypeScript client SDK
-    ├── README.md                      # SDK-specific docs
-    ├── package.json                   # @rep-protocol/sdk, zero runtime deps, tsup build
-    ├── tsconfig.json                  # ES2020, strict, DOM lib
-    ├── vitest.config.ts               # Vitest config: jsdom environment, globals
-    └── src/
-        ├── index.ts                   # Full SDK: get(), getSecure(), onChange(), verify(), meta()
-        └── __tests__/
-            └── index.test.ts          # 24 tests: get, getSecure, verify, meta, onChange, exports
+├── sdk/                               # @rep-protocol/sdk (zero runtime deps)
+│   ├── package.json                   # v0.1.2
+│   ├── src/
+│   │   ├── index.ts                   # get(), getSecure(), onChange(), verify(), meta()
+│   │   └── __tests__/index.test.ts    # 24 tests
+│   └── vitest.config.ts
+│
+├── cli/                               # @rep-protocol/cli
+│   ├── package.json                   # v0.1.1
+│   ├── bin/rep.js                     # Executable entry
+│   ├── scripts/postinstall.js         # Copies gateway binary per OS
+│   └── src/
+│       ├── commands/
+│       │   ├── dev.ts                 # Dev server (wraps gateway)
+│       │   ├── lint.ts                # Bundle secret scanning
+│       │   ├── typegen.ts             # TypeScript type generation
+│       │   └── validate.ts            # Manifest validation
+│       └── utils/
+│           ├── guardrails.ts
+│           ├── manifest.ts
+│           └── __tests__/
+│
+├── adapters/
+│   ├── react/                         # @rep-protocol/react — useRep(), useRepSecure()
+│   ├── vue/                           # @rep-protocol/vue — useRep() composable
+│   └── svelte/                        # @rep-protocol/svelte — repStore()
+│
+├── codemod/                           # @rep-protocol/codemod
+│   └── src/transforms/               # CRA, Next.js, Vite transforms
+│
+└── examples/
+    ├── .rep.yaml                      # Example manifest
+    └── todo-react/                    # Full React todo app with REP gateway
 ```
 
 ---
@@ -138,7 +138,7 @@ rep/
 
 ```
 Container boot:
-  1. Gateway reads all REP_* environment variables
+  1. Gateway reads all REP_* environment variables (+ optional .env file)
   2. Classifies into PUBLIC / SENSITIVE / SERVER tiers (by prefix)
   3. Runs guardrails (entropy scan, known format detection) on PUBLIC vars
   4. Generates ephemeral AES-256 key + HMAC-256 secret (in-memory only)
@@ -148,10 +148,10 @@ Container boot:
 
 Request flow:
   Client → [REP Gateway :8080] → [Upstream :80 (nginx/caddy)]
-  
+
   For HTML responses (Content-Type: text/html):
     Gateway intercepts response, injects <script> before </head>
-  
+
   For all other responses:
     Passed through unmodified
 ```
@@ -208,13 +208,13 @@ The `<script>` tag also carries `data-rep-integrity="sha256-<base64>"` for SRI v
 ### Security Model (Summary)
 
 - **PUBLIC vars are visible in page source.** By design. Don't put secrets here.
-- **SENSITIVE vars are encrypted at rest in HTML.** Requires a session key endpoint call to decrypt. Session keys are single-use, 30s TTL, rate-limited, origin-validated. Raises the bar from "View Source" to "achieve XSS + make authed network call + exfiltrate within TTL."
+- **SENSITIVE vars are encrypted at rest in HTML.** Requires a session key endpoint call to decrypt. Session keys are single-use, 30s TTL, rate-limited, origin-validated.
 - **SERVER vars never leave the gateway process.** Only tier suitable for true secrets.
 - **Integrity token detects transit tampering** (CDN compromise, MITM). Does NOT authenticate the source.
 - **Guardrails detect misclassified secrets** at boot: Shannon entropy > 4.5, known formats (AKIA*, eyJ*, ghp_*, sk_live_*, sk-*, xoxb-*, -----BEGIN, etc.).
 - **`--strict` mode** makes guardrail warnings into hard failures.
 
-Full threat analysis with 7 specific threats, mitigations, and honest residual risks in `spec/SECURITY-MODEL.md`.
+Full threat analysis in `spec/SECURITY-MODEL.md`.
 
 ---
 
@@ -223,82 +223,25 @@ Full threat analysis with 7 specific threats, mitigations, and honest residual r
 | Decision | Rationale |
 |---|---|
 | **Go for the gateway** | Static compilation (CGO_ENABLED=0), zero runtime deps, ~3MB binary, `FROM scratch` compatible. No Node.js or bash needed in prod. |
-| **Zero external Go dependencies** | Minimises supply chain risk. Only uses stdlib + crypto packages. **Open question:** manifest loading (§6) requires YAML parsing. Options: (a) roll a minimal YAML subset parser in ~200 lines, (b) accept a single vendored file under Apache 2.0/MIT, (c) add `gopkg.in/yaml.v3` as a justified exception, or (d) support JSON as an alternative manifest format. The tradeoff is supply chain purity vs implementation cost. Decision needed before `--manifest` is implemented. |
-| **`pkg/payload` imports from `internal/`** | This is valid Go. The `internal/` rule restricts imports from outside the parent directory tree. Since both `pkg/` and `internal/` live under `gateway/`, the import is allowed. No type extraction to `pkg/types/` is needed. |
-| **`inject.go` strips `Accept-Encoding`** | The injection middleware removes `Accept-Encoding` from proxied requests so upstreams always respond with identity encoding. This avoids needing to decompress/recompress to inject the `<script>` tag. A gzip fallback via `compress/gzip` (stdlib) handles non-compliant upstreams. Brotli is unsupported (no stdlib support, zero-dep constraint) — logged and passed through uninjected. |
+| **Zero external Go dependencies** | Minimises supply chain risk. Only stdlib + crypto. Manifest parsing uses a hand-rolled YAML subset parser (~250 lines) to maintain this constraint. |
+| **`pkg/payload` imports from `internal/`** | Valid Go — `internal/` rule only restricts imports from outside the parent directory tree. Both live under `gateway/`. |
+| **`inject.go` strips `Accept-Encoding`** | Upstreams always respond with identity encoding, avoiding decompress/recompress. Gzip fallback via `compress/gzip` (stdlib) for non-compliant upstreams. Brotli unsupported (no stdlib, zero-dep constraint) — logged and passed through uninjected. |
 | **`type="application/json"` on script tag** | Browser does NOT execute it. Inert data. No CSP conflicts. |
-| **`id="__rep__"` for discovery** | Stable, predictable selector. SDK finds it synchronously. |
-| **Synchronous `get()`, async `getSecure()`** | Public vars must be available instantly (no loading states, no Suspense). Sensitive vars accept one network call. |
+| **Synchronous `get()`, async `getSecure()`** | Public vars available instantly (no loading states). Sensitive vars accept one network call. |
 | **HMAC integrity computed over canonicalised JSON** | Deterministic (sorted keys, no whitespace). Verifiable independently. |
 | **Ephemeral keys (generated at startup, never stored)** | Key compromise requires gateway process compromise. No key storage = no key theft from disk. |
 | **Session keys are single-use** | Prevents replay. Rate limiting prevents brute force. |
-| **Prefix-based classification** | Forces developers to make an explicit security decision per variable. No ambiguity. |
-| **SPA fallback in embedded mode** | Paths without extensions serve `index.html`. Standard SPA routing support. |
-| **Hot reload via SSE (not WebSocket)** | SSE is simpler, auto-reconnects, works through most proxies, sufficient for one-directional config push. |
+| **Prefix-based classification** | Forces explicit security decision per variable. No ambiguity. |
+| **Hot reload via SSE (not WebSocket)** | Simpler, auto-reconnects, works through most proxies, sufficient for one-directional config push. |
+| **pnpm monorepo** | Single lockfile, workspace linking, strict dependency resolution. All TS packages in one repo. |
+| **release-please** | Conventional-commit-driven releases, independent versioning per package, automated changelogs. |
 
 ---
 
-## Current State & What Needs Doing
+## Remaining Work
 
-### Completed ✅
-
-- [x] Full RFC specification (REP-RFC-0001.md) — 14 sections covering all aspects
-- [x] Security model document — 7 threat analyses with mitigations and residual risks
-- [x] Integration guide — React, Vue, Svelte, Angular, vanilla JS + CI/CD + K8s patterns
-- [x] JSON schemas for payload and manifest
-- [x] Example `.rep.yaml` manifest
-- [x] Go gateway source code — all packages, compiles with zero deps
-- [x] TypeScript SDK source — full API per spec
-- [x] Dockerfile (multi-stage, FROM scratch)
-- [x] Makefile with build/test/docker/cross-compile targets
-- [x] Go unit tests for all 8 packages (config, crypto, guardrails, health, hotreload, inject, server, payload) — all pass with `-race`
-- [x] TypeScript SDK tests — 24 tests via vitest + jsdom (get, getSecure, verify, meta, onChange, exports)
-- [x] `gateway/VERSION` file (`0.1.0`)
-- [x] `gateway/testdata/static/index.html` for `make run-example`
-- [x] `go.sum` generated via `go mod tidy`
-- [x] `inject.go` — `sync.RWMutex` added to `Middleware` for concurrent safety during hot reload
-- [x] `inject.go` — compressed upstream handling: strips `Accept-Encoding` from proxied requests + gzip decompression fallback via stdlib
-- [x] `getSecure()` error handling verified — throws `REPError` for missing payload, missing sensitive blob, and fetch failures (covered by SDK tests)
-
-### Important Findings (Resolved)
-
-- **`pkg/payload` importing `internal/config` is VALID.** Go's `internal/` rule allows imports from any package under the same parent directory. Both `pkg/` and `internal/` are under `gateway/`, so no refactoring needed.
-- **Gateway compiles as-is with zero dependencies.** No compilation issues found — `orderedMap`, `responseRecorder`, and all types compile correctly.
-
-### Needs Doing 🔲
-
-#### Priority 2: Structural Issues
-
-- [ ] **Add `.gitignore`** — standard Go + Node ignores (bin/, dist/, node_modules/, coverage.*, *.out)
-
-#### Priority 3: Robustness & Edge Cases (items NOT yet addressed)
-
+### Robustness
 - [ ] **Handle chunked transfer encoding** — the recorder buffers the entire response. Consider streaming for large non-HTML responses (pass through without buffering).
-- [ ] **Session key endpoint: use derived keys, not raw encryption key** — currently `session_key.go` sends the actual AES encryption key to the client. In production, this should use HKDF to derive a per-session key, or use key wrapping (AES-KW).
-
-#### Priority 4: Developer Experience
-
-- [ ] **CLI tool** — `@rep-protocol/cli` for:
-  - `rep validate --manifest .rep.yaml` — validate manifest
-  - `rep typegen --manifest .rep.yaml --output src/rep.d.ts` — TypeScript type generation
-  - `rep lint --dir ./dist` — scan built bundles for leaked secrets
-  - `rep dev --env .env.local --port 8080 --proxy http://localhost:5173` — dev server
-- [ ] **Codemod** — `@rep-protocol/codemod` to transform `import.meta.env.VITE_X` → `rep.get('X')`
-- [ ] **Framework adapters** — separate packages:
-  - `@rep-protocol/react` — `useRep()`, `useRepSecure()` hooks
-  - `@rep-protocol/vue` — `useRep()` composable
-  - `@rep-protocol/svelte` — `repStore()` readable store
-
-#### Priority 5: Publishing & Distribution
-
-- [ ] **GitHub repo setup** — `github.com/ruachtech/rep` with:
-  - GitHub Actions CI (Go test + lint, SDK test + build, Docker build)
-  - Release workflow (GoReleaser for multi-platform binaries)
-  - GHCR publish for Docker image
-  - npm publish for SDK
-- [ ] **GoReleaser config** — `.goreleaser.yml` for automated cross-platform binary releases
-- [ ] **Docker multi-arch builds** — linux/amd64 + linux/arm64
-- [ ] **npm provenance attestations** for SDK package
 
 ---
 
@@ -330,81 +273,45 @@ Full threat analysis with 7 specific threats, mitigations, and honest residual r
 
 ### TypeScript (Testing)
 
-- **Vitest + jsdom.** Config in `sdk/vitest.config.ts` sets `environment: 'jsdom'` and `globals: true`.
-- **`vi.resetModules()` before each test.** The SDK's `_init()` runs on module load, so each test must reset module cache and use dynamic `import('../index')` to get a fresh SDK instance.
-- **DOM cleanup in `beforeEach`.** Clear `document.head` and `document.body` before each test to remove injected `<script>` elements.
-- **Mock `EventSource` for hot reload tests.** Use `vi.stubGlobal('EventSource', vi.fn(() => mockES))` since jsdom doesn't provide `EventSource`.
-- **Mock `fetch` for `getSecure()` tests.** Use `vi.stubGlobal('fetch', fetchMock)` to test session key fetch failures without a real server.
-
-### Documentation
-
-- **Every Go package has a doc comment** explaining its role and referencing the relevant RFC section.
-- **Every exported function/type has a doc comment.**
-- **Spec references use §N.N notation.** e.g., "Per REP-RFC-0001 §4.3" or "See §8.2 for blob format."
-
----
-
-## Key Spec References (Quick Lookup)
-
-| Topic | Location |
-|---|---|
-| Variable classification rules | REP-RFC-0001.md §3 |
-| Secret detection guardrails | REP-RFC-0001.md §3.3 |
-| Gateway startup sequence (10 steps) | REP-RFC-0001.md §4.2 |
-| HTML injection rules | REP-RFC-0001.md §4.3 |
-| Session key endpoint spec | REP-RFC-0001.md §4.4 |
-| Health check endpoint spec | REP-RFC-0001.md §4.5 |
-| Hot reload SSE spec | REP-RFC-0001.md §4.6 |
-| Client SDK API | REP-RFC-0001.md §5.2 |
-| SDK init behaviour (must be sync) | REP-RFC-0001.md §5.3 |
-| Manifest schema | REP-RFC-0001.md §6 |
-| Gateway CLI flags | REP-RFC-0001.md §7 |
-| Payload JSON schema | REP-RFC-0001.md §8.1 |
-| Encrypted blob format | REP-RFC-0001.md §8.2 |
-| HMAC integrity computation | REP-RFC-0001.md §8.3 |
-| Deployment patterns (Docker, K8s, sidecar) | REP-RFC-0001.md §9 |
-| Migration path | REP-RFC-0001.md §10 |
-| Conformance checklist | REP-RFC-0001.md §11 |
-| Trust boundary diagram | SECURITY-MODEL.md §1.1 |
-| 7 threat analyses | SECURITY-MODEL.md §2 |
-| Classification decision tree | SECURITY-MODEL.md §3.1 |
-| Common misclassification table | SECURITY-MODEL.md §3.2 |
-| CSP recommendations | SECURITY-MODEL.md §4.2 |
-| Log event catalogue | SECURITY-MODEL.md §4.3 |
-| Framework integration examples | INTEGRATION-GUIDE.md §2 |
-| CI/CD patterns | INTEGRATION-GUIDE.md §3 |
-| Container patterns | INTEGRATION-GUIDE.md §4 |
-| Testing strategies | INTEGRATION-GUIDE.md §5 |
-| Migration checklist | INTEGRATION-GUIDE.md §6 |
+- **Vitest + jsdom** across all TS packages.
+- **`vi.resetModules()` before each test** in SDK tests. The SDK's `_init()` runs on module load, so each test must reset module cache and use dynamic `import('../index')` to get a fresh instance.
+- **DOM cleanup in `beforeEach`.** Clear `document.head` and `document.body` before each test.
+- **Mock `EventSource`** for hot reload tests. jsdom doesn't provide `EventSource`.
+- **Mock `fetch`** for `getSecure()` tests.
 
 ---
 
 ## Build & Run Commands
 
 ```bash
-# Gateway
-cd gateway
-make build                  # Build for current platform → bin/rep-gateway
-make build-linux            # Cross-compile for Linux amd64
-make docker                 # Build Docker image
-make test                   # Run all tests
-make run-example            # Run locally with example env vars
-go test -race ./...         # Run all tests with race detector (recommended)
-go test -race -count=1 ./...  # Same, bypassing cache
+# Monorepo (from root)
+pnpm install                    # Install all workspace dependencies
+pnpm -r build                   # Build all TS packages
+pnpm -r test                    # Test all TS packages
 
-# SDK
-cd sdk
-npm install                 # Also installs jsdom (devDep for vitest)
-npm run build               # Build CJS + ESM + types → dist/
-npm test                    # Run vitest (24 tests, jsdom environment)
-npm run test:watch          # Run vitest in watch mode
+# Gateway (from gateway/)
+make build                      # Build for current platform → bin/rep-gateway
+make build-linux                # Cross-compile for Linux amd64
+make docker                     # Build Docker image
+make test                       # Run all tests
+make run-example                # Run locally with example env vars
+go test -race ./...             # Run all tests with race detector (recommended)
+go test -race -count=1 ./...    # Same, bypassing cache
+
+# SDK (from sdk/)
+pnpm build                      # Build CJS + ESM + types → dist/
+pnpm test                       # Run vitest (24 tests, jsdom environment)
+
+# CLI (from cli/)
+pnpm build && pnpm test
+
+# Adapters (from adapters/react/, adapters/vue/, adapters/svelte/)
+pnpm build && pnpm test
 ```
 
 ---
 
 ## Environment Variables (Application)
-
-The gateway reads these from the container environment:
 
 ```bash
 # Application variables (injected into HTML)
@@ -431,10 +338,36 @@ REP_GATEWAY_ALLOWED_ORIGINS=https://app.example.com
 
 2. **The SDK's `get()` MUST remain synchronous.** No promises, no async, no lazy loading. This is a core design requirement (§R4). If `get()` becomes async, every consuming component needs loading states, and the DX advantage over `fetch('/config.json')` vanishes.
 
-3. **The gateway generates NEW ephemeral keys on every restart.** This is intentional. It means a gateway restart invalidates all previously issued session keys and re-encrypts the sensitive blob. Clients that cached decrypted values will still have them (in-memory), but new `getSecure()` calls will use the new keys.
+3. **The gateway generates NEW ephemeral keys on every restart.** This is intentional. It means a gateway restart invalidates all previously issued session keys and re-encrypts the sensitive blob.
 
-4. **The HMAC secret is never transmitted.** It exists only in the gateway's memory. The SDK cannot verify the HMAC — it can only verify the SRI hash (content matches the `data-rep-integrity` attribute). This is an honest limitation documented in the security model.
+4. **The HMAC secret is never transmitted.** It exists only in the gateway's memory. The SDK cannot verify the HMAC — it can only verify the SRI hash (content matches the `data-rep-integrity` attribute).
 
 5. **Prefix stripping creates a flat namespace.** `REP_PUBLIC_API_URL` and `REP_SENSITIVE_API_URL` would both become `API_URL` in the payload — which is why the gateway MUST reject this collision at startup. This is enforced in `classify.go`.
 
-6. **Hot reload SSE connects lazily.** The SDK does NOT establish an SSE connection on import. It only connects when `onChange()` or `onAnyChange()` is first called. This avoids unnecessary connections for apps that don't use hot reload.
+6. **Hot reload SSE connects lazily.** The SDK does NOT establish an SSE connection on import. It only connects when `onChange()` or `onAnyChange()` is first called.
+
+---
+
+## Key Spec References
+
+| Topic | Location |
+|---|---|
+| Variable classification rules | REP-RFC-0001.md §3 |
+| Secret detection guardrails | REP-RFC-0001.md §3.3 |
+| Gateway startup sequence | REP-RFC-0001.md §4.2 |
+| HTML injection rules | REP-RFC-0001.md §4.3 |
+| Session key endpoint | REP-RFC-0001.md §4.4 |
+| Health check endpoint | REP-RFC-0001.md §4.5 |
+| Hot reload SSE | REP-RFC-0001.md §4.6 |
+| Client SDK API | REP-RFC-0001.md §5.2 |
+| SDK init (must be sync) | REP-RFC-0001.md §5.3 |
+| Manifest schema | REP-RFC-0001.md §6 |
+| Gateway CLI flags | REP-RFC-0001.md §7 |
+| Payload JSON schema | REP-RFC-0001.md §8.1 |
+| Encrypted blob format | REP-RFC-0001.md §8.2 |
+| HMAC integrity | REP-RFC-0001.md §8.3 |
+| Deployment patterns | REP-RFC-0001.md §9 |
+| Threat analyses | SECURITY-MODEL.md §2 |
+| CSP recommendations | SECURITY-MODEL.md §4.2 |
+| Framework integration | INTEGRATION-GUIDE.md §2 |
+| CI/CD patterns | INTEGRATION-GUIDE.md §3 |

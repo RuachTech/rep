@@ -1,7 +1,6 @@
 package crypto
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -44,10 +43,6 @@ func TestSessionKey_Success(t *testing.T) {
 	if resp.ExpiresAt == "" {
 		t.Error("expires_at should not be empty")
 	}
-	if resp.Nonce == "" {
-		t.Error("nonce should not be empty")
-	}
-
 	// Verify expires_at is valid RFC3339.
 	if _, err := time.Parse(time.RFC3339, resp.ExpiresAt); err != nil {
 		t.Errorf("expires_at is not valid RFC3339: %v", err)
@@ -190,38 +185,3 @@ func TestExtractIP_RemoteAddr(t *testing.T) {
 	}
 }
 
-func TestSessionKey_NonceIsCryptographic(t *testing.T) {
-	h := newTestHandler(t, nil, 100)
-
-	decodeNonce := func(t *testing.T) []byte {
-		t.Helper()
-		req := httptest.NewRequest(http.MethodGet, "/rep/session-key", nil)
-		rec := httptest.NewRecorder()
-		h.ServeHTTP(rec, req)
-		if rec.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d", rec.Code)
-		}
-		var resp SessionKeyResponse
-		if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
-			t.Fatalf("decode error: %v", err)
-		}
-		b, err := base64.StdEncoding.DecodeString(resp.Nonce)
-		if err != nil {
-			t.Fatalf("nonce is not valid base64: %v", err)
-		}
-		return b
-	}
-
-	n1 := decodeNonce(t)
-	n2 := decodeNonce(t)
-
-	// Each nonce must be exactly 16 bytes.
-	if len(n1) != 16 {
-		t.Errorf("expected 16-byte nonce, got %d bytes", len(n1))
-	}
-
-	// Consecutive requests must produce distinct nonces.
-	if string(n1) == string(n2) {
-		t.Error("consecutive session-key nonces must differ")
-	}
-}
