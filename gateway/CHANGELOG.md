@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.2](https://github.com/RuachTech/rep/compare/gateway/v0.1.1...gateway/v0.1.2) (2026-02-21)
+
+
+### Features
+
+* **gateway:** add support for .env file parsing and integration with environment variable classification ([cb220c4](https://github.com/RuachTech/rep/commit/cb220c423d66de4f85332cb571a8b8948d434aaf))
+
+
+### Bug Fixes
+
+* update release configuration and versioning for consistency ([23d6a32](https://github.com/RuachTech/rep/commit/23d6a323534414aeffc09fbe413f50015cbac992))
+
 ## [0.1.1](https://github.com/RuachTech/rep/compare/gateway/v0.1.0...gateway/v0.1.1) (2026-02-21)
 
 
