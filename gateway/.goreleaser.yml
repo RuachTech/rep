@@ -54,7 +54,7 @@ release:
     ## REP Gateway {{.Version}}
 
 changelog:
-  use: github
+  use: git
   sort: asc
   filters:
     exclude:

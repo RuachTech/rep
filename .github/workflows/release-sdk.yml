@@ -109,37 +109,55 @@ jobs:
 
       - name: Publish sdk
         working-directory: sdk
-        run: npm publish --provenance --access public
+        run: |
+          V=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @rep-protocol/sdk@${V} version 2>/dev/null || true)
+          if [ "$PUBLISHED" = "$V" ]; then echo "sdk@${V} already published, skipping."; else npm publish --provenance --access public; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish cli
         working-directory: cli
-        run: npm publish --provenance --access public
+        run: |
+          V=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @rep-protocol/cli@${V} version 2>/dev/null || true)
+          if [ "$PUBLISHED" = "$V" ]; then echo "cli@${V} already published, skipping."; else npm publish --provenance --access public; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish codemod
         working-directory: codemod
-        run: npm publish --provenance --access public
+        run: |
+          V=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @rep-protocol/codemod@${V} version 2>/dev/null || true)
+          if [ "$PUBLISHED" = "$V" ]; then echo "codemod@${V} already published, skipping."; else npm publish --provenance --access public; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish react adapter
         working-directory: adapters/react
-        run: npm publish --provenance --access public
+        run: |
+          V=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @rep-protocol/react@${V} version 2>/dev/null || true)
+          if [ "$PUBLISHED" = "$V" ]; then echo "react@${V} already published, skipping."; else npm publish --provenance --access public; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish vue adapter
         working-directory: adapters/vue
-        run: npm publish --provenance --access public
+        run: |
+          V=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @rep-protocol/vue@${V} version 2>/dev/null || true)
+          if [ "$PUBLISHED" = "$V" ]; then echo "vue@${V} already published, skipping."; else npm publish --provenance --access public; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Publish svelte adapter
         working-directory: adapters/svelte
-        run: npm publish --provenance --access public
+        run: |
+          V=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @rep-protocol/svelte@${V} version 2>/dev/null || true)
+          if [ "$PUBLISHED" = "$V" ]; then echo "svelte@${V} already published, skipping."; else npm publish --provenance --access public; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
