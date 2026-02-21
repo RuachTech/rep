@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/RuachTech/rep/compare/v0.1.1...v0.1.2) (2026-02-21)
+
+
+### Bug Fixes
+
+* update repository URLs to use correct casing for GitHub links ([#3](https://github.com/RuachTech/rep/issues/3)) ([a99c3a5](https://github.com/RuachTech/rep/commit/a99c3a5721bcfbe204ec420a9705dce27d8d269b))
+
 ## [0.1.1](https://github.com/RuachTech/rep/compare/v0.1.0...v0.1.1) (2026-02-21)
 
 
