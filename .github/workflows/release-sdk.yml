@@ -21,6 +21,8 @@ jobs:
       gateway_release_created: ${{ steps.release.outputs['gateway--release_created'] }}
       gateway_tag_name: ${{ steps.release.outputs['gateway--tag_name'] }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Validate release-please title patterns
         run: |
           set -euo pipefail
