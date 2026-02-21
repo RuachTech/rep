@@ -80,7 +80,7 @@ This project uses **pnpm workspaces** for managing the monorepo. All TypeScript 
 ### Prerequisites
 
 - **Node.js** >= 20.0.0
-- **pnpm** >= 8.0.0 (install via `npm install -g pnpm`)
+- **pnpm** >= 9.0.0 (install via `npm install -g pnpm`)
 - **Go** >= 1.24.5 (for gateway development)
 
 ### Installation
@@ -188,9 +188,24 @@ rep.onChange('FEATURE_FLAGS', (newVal) => {   // Hot reload
 | [Security Model](spec/SECURITY-MODEL.md) | **Draft** | 0.1.0 |
 | [Integration Guide](spec/INTEGRATION-GUIDE.md) | **Draft** | 0.1.0 |
 
+## Releases & Versioning
+
+All npm packages (`@rep-protocol/sdk`, `@rep-protocol/cli`, `@rep-protocol/codemod`, and the framework adapters) share a single version number and are released together using [release-please](https://github.com/googleapis/release-please).
+
+- Versions are determined automatically from **conventional commits** on `main`
+- `fix: ...` → patch bump, `feat: ...` → minor bump, `feat!: ...` → major bump
+- On push to `main`, a Release PR is created/updated with version bumps and changelogs
+- Merging the Release PR triggers npm publishing for all packages
+- The Go gateway is versioned independently via `gateway/VERSION` and released through GoReleaser
+
 ## Contributing
 
-REP is in early specification phase. We welcome feedback, critiques, and contributions. Open an issue or submit a PR against the spec documents.
+We welcome contributions! Please read our [Contributing Guide](CONTRIBUTING.md) for details on:
+
+- Development setup and workflow
+- Commit message conventions (conventional commits required)
+- How the automated release process works
+- Code style guidelines for Go and TypeScript
 
 ## License
 

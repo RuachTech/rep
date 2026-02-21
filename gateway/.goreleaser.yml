@@ -1,5 +1,6 @@
 # GoReleaser configuration for REP Gateway.
 # Triggered by tags matching gateway/v* (e.g. gateway/v0.1.0).
+# The workflow sets GORELEASER_CURRENT_TAG to strip the gateway/ prefix.
 # See: https://goreleaser.com/customization/
 
 version: 2
@@ -8,7 +9,6 @@ project_name: rep-gateway
 
 builds:
   - id: rep-gateway
-    dir: gateway
     main: ./cmd/rep-gateway
     binary: rep-gateway
     env:
@@ -21,7 +21,7 @@ builds:
       - amd64
       - arm64
     ldflags:
-      - -s -w -X github.com/ruachtech/rep/gateway/cmd/rep-gateway.version={{.Version}}
+      - -s -w -X main.version={{.Version}}
     flags:
       - -trimpath
 
@@ -47,7 +47,6 @@ release:
     owner: ruachtech
     name: rep
   name_template: "Gateway v{{.Version}}"
-  # Only include commits that touched gateway/ in the changelog
   header: |
     ## REP Gateway {{.Version}}
 

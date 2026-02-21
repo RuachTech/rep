@@ -1,0 +1,9 @@
+{
+  "sdk": "0.1.0",
+  "cli": "0.1.0",
+  "codemod": "0.1.0",
+  "adapters/react": "0.1.0",
+  "adapters/vue": "0.1.0",
+  "adapters/svelte": "0.1.0",
+  "gateway": "0.1.0"
+}

@@ -1,0 +1,51 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "node",
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": true,
+  "group-pull-request-title-pattern": "chore: release v${version}",
+  "pull-request-title-pattern": "chore: release v${version}",
+  "include-component-in-tag": false,
+  "packages": {
+    "sdk": {
+      "component": "sdk"
+    },
+    "cli": {
+      "component": "cli"
+    },
+    "codemod": {
+      "component": "codemod"
+    },
+    "adapters/react": {
+      "component": "react"
+    },
+    "adapters/vue": {
+      "component": "vue"
+    },
+    "adapters/svelte": {
+      "component": "svelte"
+    },
+    "gateway": {
+      "release-type": "simple",
+      "component": "gateway",
+      "include-component-in-tag": true,
+      "tag-separator": "/",
+      "extra-files": [
+        "VERSION"
+      ]
+    }
+  },
+  "linked-versions": {
+    "rep-packages": {
+      "component": "rep",
+      "packages": [
+        "sdk",
+        "cli",
+        "codemod",
+        "adapters/react",
+        "adapters/vue",
+        "adapters/svelte"
+      ]
+    }
+  }
+}

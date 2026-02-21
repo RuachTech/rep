@@ -24,13 +24,20 @@ jobs:
           go-version: '1.24.5'
           cache-dependency-path: gateway/go.sum
 
+      - name: Extract version from tag
+        id: goreleaser-tag
+        # Tag format: gateway/v0.1.0 → v0.1.0 (GoReleaser expects plain vX.Y.Z)
+        run: echo "tag=${GITHUB_REF_NAME#gateway/}" >> "$GITHUB_OUTPUT"
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
           version: '~> v2'
           args: release --clean
+          workdir: gateway
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GORELEASER_CURRENT_TAG: ${{ steps.goreleaser-tag.outputs.tag }}
 
   docker:
     name: Docker multi-arch
