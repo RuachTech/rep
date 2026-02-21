@@ -10,6 +10,10 @@
 # Use the build platform (host) for the compiler stage to avoid QEMU slowdown.
 FROM --platform=$BUILDPLATFORM golang:1.24.5-alpine AS build
 
+# Apply latest Alpine security fixes in the builder stage.
+# Some scanners (including Docker DX) report vulnerabilities from all stages.
+RUN apk upgrade --no-cache && apk add --no-cache ca-certificates
+
 # TARGETOS / TARGETARCH are injected by docker buildx for cross-compilation.
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64

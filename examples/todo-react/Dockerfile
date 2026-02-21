@@ -43,6 +43,8 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 # Copy every package.json in the workspace so pnpm can resolve the full graph.
 COPY sdk/package.json                    sdk/
 COPY cli/package.json                    cli/
+COPY cli/bin/rep.js                      cli/bin/
+COPY cli/scripts/postinstall.js          cli/scripts/
 COPY codemod/package.json                codemod/
 COPY adapters/react/package.json         adapters/react/
 COPY adapters/vue/package.json           adapters/vue/
