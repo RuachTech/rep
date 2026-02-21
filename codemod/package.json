@@ -9,6 +9,11 @@
     "dist",
     "bin"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RuachTech/rep",
+    "directory": "codemod"
+  },
   "scripts": {
     "build": "tsc",
     "test": "vitest run"

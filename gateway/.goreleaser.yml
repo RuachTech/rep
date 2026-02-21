@@ -1,6 +1,8 @@
 # GoReleaser configuration for REP Gateway.
 # Triggered by tags matching gateway/v* (e.g. gateway/v0.1.0).
-# The workflow sets GORELEASER_CURRENT_TAG to strip the gateway/ prefix.
+# The workflow creates a temporary local tag (e.g. v0.1.0) from the prefixed tag
+# so GoReleaser's git validation passes. GORELEASER_CURRENT_TAG is set to that
+# stripped version. The temp tag is never pushed.
 # See: https://goreleaser.com/customization/
 
 version: 2
