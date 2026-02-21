@@ -5,5 +5,5 @@
   "adapters/react": "0.1.1",
   "adapters/vue": "0.1.1",
   "adapters/svelte": "0.1.1",
-  "gateway": "0.1.1"
+  "gateway": "0.1.2"
 }
