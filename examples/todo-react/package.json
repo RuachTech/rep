@@ -10,7 +10,7 @@
     "rep:validate": "rep validate --manifest .rep.yaml",
     "rep:typegen": "rep typegen --manifest .rep.yaml --output src/rep.d.ts",
     "rep:lint": "rep lint --dir ./dist",
-    "rep:dev": "rep dev --env .env.local --proxy http://localhost:5173",
+    "rep:dev": "rep dev --env .env.local --proxy http://localhost:5173 --hot-reload",
     "rep:serve": "rep dev --env .env.local --static ./dist --hot-reload"
   },
   "dependencies": {

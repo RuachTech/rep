@@ -56,4 +56,4 @@ variables:
 
 settings:
   strict_guardrails: false   # set to true in production
-  hot_reload: false
+  hot_reload: true
