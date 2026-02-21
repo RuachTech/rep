@@ -46,6 +46,11 @@ type Config struct {
 	WatchPath     string
 	PollInterval  time.Duration
 
+	// Path to a .env file to read variables from. When set, the gateway reads
+	// this file in addition to os.Environ() (process env takes precedence).
+	// On hot reload, the file is re-read to pick up changes.
+	EnvFile string
+
 	// Logging.
 	LogFormat   string // "json" or "text"
 	LogLevelStr string // "debug", "info", "warn", "error"
@@ -147,6 +152,7 @@ func Parse(args []string, version string) (*Config, error) {
 	fs.BoolVar(&cfg.HotReload, "hot-reload", envOrDefaultBool("REP_GATEWAY_HOT_RELOAD", defaultHotReload), "Enable hot reload SSE endpoint")
 	fs.StringVar(&cfg.HotReloadMode, "hot-reload-mode", envOrDefault("REP_GATEWAY_HOT_RELOAD_MODE", defaultHotReloadMode), `Hot reload mode: "file_watch", "signal", or "poll"`)
 	fs.StringVar(&cfg.WatchPath, "watch-path", envOrDefault("REP_GATEWAY_WATCH_PATH", ""), "Path to watch for config changes (file_watch mode)")
+	fs.StringVar(&cfg.EnvFile, "env-file", envOrDefault("REP_GATEWAY_ENV_FILE", ""), "Path to .env file to read variables from (re-read on hot reload)")
 	pollInterval := fs.String("poll-interval", envOrDefault("REP_GATEWAY_POLL_INTERVAL", defaultPollInterval), "Poll interval (poll mode)")
 	fs.StringVar(&cfg.LogFormat, "log-format", envOrDefault("REP_GATEWAY_LOG_FORMAT", "json"), `Log format: "json" or "text"`)
 	fs.StringVar(&cfg.LogLevelStr, "log-level", envOrDefault("REP_GATEWAY_LOG_LEVEL", "info"), `Log level: "debug", "info", "warn", "error"`)

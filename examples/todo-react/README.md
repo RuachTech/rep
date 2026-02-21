@@ -143,9 +143,10 @@ pnpm rep:dev
 pnpm rep:serve
 ```
 
-The CLI reads `.env.local`, strips comments, exports every `REP_*` var into
-the spawned gateway's environment, and passes the right `--mode`, `--upstream`,
-and `--static-dir` flags automatically.
+The CLI passes `--env-file .env.local` to the gateway so it reads the file
+directly. With `--hot-reload`, the CLI also sets `--hot-reload-mode file_watch`
+and `--watch-path` automatically — edit `.env.local` and the gateway picks up
+changes live via SSE, no restart needed.
 
 ---
 
@@ -253,9 +254,45 @@ The gateway exposes a Server-Sent Events endpoint at `/rep/changes`. The SDK
 connects to it lazily when any `useRep()` hook mounts, and re-renders
 subscribed components when a change event arrives.
 
-**Start the gateway with hot reload enabled:**
+#### Using the CLI (recommended)
+
+The `rep:dev` and `rep:serve` scripts already pass `--hot-reload`, which
+automatically sets up file watching on `.env.local`:
 
 ```bash
+pnpm rep:serve
+```
+
+Open `http://localhost:8080`, then edit `.env.local` — for example, change
+`REP_PUBLIC_APP_TITLE=REP Todo` to `REP_PUBLIC_APP_TITLE=My Todos`. The
+gateway detects the file change, re-reads it, and pushes updates via SSE.
+The browser updates without a page reload.
+
+#### Using the gateway directly
+
+Use `--env-file` to point the gateway at a `.env` file, and `--hot-reload-mode
+file_watch` with `--watch-path` to watch it for changes:
+
+```bash
+./gateway/bin/rep-gateway \
+  --mode embedded \
+  --static-dir examples/todo-react/dist \
+  --env-file .env.local \
+  --hot-reload \
+  --hot-reload-mode file_watch \
+  --watch-path .env.local
+```
+
+Edit `.env.local` in your editor. The gateway detects the mtime change,
+re-reads the file, rebuilds the payload, and broadcasts diffs over SSE.
+Connected browser tabs re-render — **no page load, no restart**.
+
+#### Manual signal mode
+
+You can also trigger a reload manually with `SIGHUP` (useful for scripting):
+
+```bash
+# Start with signal mode (the default when --env-file is not watched)
 REP_PUBLIC_APP_TITLE="REP Todo" \
 REP_PUBLIC_ENV_NAME=development \
 REP_PUBLIC_API_URL=http://localhost:3001 \
@@ -265,43 +302,10 @@ REP_SENSITIVE_ANALYTICS_KEY=ak_demo_abc123 \
   --mode embedded \
   --static-dir examples/todo-react/dist \
   --hot-reload
-```
 
-Open `http://localhost:8080` and click **Show Config**. Observe the SSE
-connection in the Network tab (`/rep/changes`, type: `eventsource`).
-
-**Trigger a reload — no rebuild, no page refresh:**
-
-In a second terminal, send `SIGHUP` to the gateway process. It re-reads
-`os.Environ()`, rebuilds the payload, and broadcasts diffs over SSE:
-
-```bash
+# In another terminal:
 kill -HUP $(pgrep rep-gateway)
 ```
-
-The connected browser tabs receive the event and `useRep()` hooks re-render
-with the updated values — **no page load**.
-
-**Changing values between restarts (no rebuild):**
-
-To see different values, restart the gateway with new env vars — the built
-`dist/` is untouched:
-
-```bash
-# Ctrl+C the running gateway, then:
-REP_PUBLIC_APP_TITLE="My Todos" \
-REP_PUBLIC_ENV_NAME=staging \
-REP_PUBLIC_MAX_TODOS=3 \
-REP_SENSITIVE_ANALYTICS_KEY=ak_demo_abc123 \
-./gateway/bin/rep-gateway \
-  --mode embedded \
-  --static-dir examples/todo-react/dist \
-  --hot-reload
-```
-
-The title changes from `REP Todo` to `My Todos`, the badge turns amber
-(`staging`), and the add form locks after 3 todos — all from env vars, all
-without `npm run build`.
 
 > **Production hot reload:** In Kubernetes or Docker Swarm, env vars can be
 > rotated in-flight via ConfigMaps or secrets. The gateway detects the change
@@ -327,7 +331,7 @@ docker run --rm -p 8080:8080 \
   -e REP_PUBLIC_APP_TITLE="REP Todo" \
   -e REP_PUBLIC_ENV_NAME=development \
   -e REP_PUBLIC_API_URL=http://localhost:3001 \
-  -e REP_PUBLIC_MAX_TODOS=5 \
+  -e REP_PUBLIC_MAX_TODOS=55 \
   -e REP_SENSITIVE_ANALYTICS_KEY=ak_demo_abc123 \
   rep-todo
 ```
@@ -400,8 +404,8 @@ variables differ between deployments — exactly like any other twelve-factor ap
 |---|---|---|
 | `pnpm rep:validate` | `rep validate --manifest .rep.yaml` | Validate manifest schema and constraints |
 | `pnpm rep:typegen` | `rep typegen --manifest .rep.yaml --output src/rep.d.ts` | Generate typed SDK overloads |
-| `pnpm rep:dev` | `rep dev --env .env.local --proxy http://localhost:5173` | Dev server (proxy mode) |
-| `pnpm rep:serve` | `rep dev --env .env.local --static ./dist --hot-reload` | Dev server (embedded, hot reload) |
+| `pnpm rep:dev` | `rep dev --env .env.local --proxy http://localhost:5173 --hot-reload` | Dev server (proxy mode, file watching) |
+| `pnpm rep:serve` | `rep dev --env .env.local --static ./dist --hot-reload` | Dev server (embedded, file watching) |
 | `pnpm rep:lint` | `rep lint --dir ./dist` | Scan build output for leaked secrets |
 
 ---

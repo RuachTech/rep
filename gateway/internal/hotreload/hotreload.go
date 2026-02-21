@@ -65,6 +65,18 @@ func (h *Hub) ClientCount() int {
 	return len(h.clients)
 }
 
+// Close unsubscribes and closes all client channels, causing their SSE
+// handlers to return. This unblocks http.Server.Shutdown() which waits
+// for active handlers to finish.
+func (h *Hub) Close() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	for ch := range h.clients {
+		delete(h.clients, ch)
+		close(ch)
+	}
+}
+
 // subscribe registers a new client channel and returns an unsubscribe function.
 func (h *Hub) subscribe() (chan Event, func()) {
 	ch := make(chan Event, 16) // Buffered to handle bursts.
@@ -75,9 +87,13 @@ func (h *Hub) subscribe() (chan Event, func()) {
 
 	unsub := func() {
 		h.mu.Lock()
-		delete(h.clients, ch)
-		h.mu.Unlock()
-		close(ch)
+		if _, ok := h.clients[ch]; ok {
+			delete(h.clients, ch)
+			h.mu.Unlock()
+			close(ch)
+		} else {
+			h.mu.Unlock()
+		}
 	}
 
 	return ch, unsub
