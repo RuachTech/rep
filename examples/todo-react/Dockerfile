@@ -18,7 +18,7 @@
 FROM --platform=$BUILDPLATFORM golang:1.24.5-alpine AS gateway
 
 ARG TARGETOS=linux
-ARG TARGETARCH=amd64
+ARG TARGETARCH=arm64
 
 WORKDIR /src
 COPY gateway/go.mod ./
@@ -43,6 +43,8 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 # Copy every package.json in the workspace so pnpm can resolve the full graph.
 COPY sdk/package.json                    sdk/
 COPY cli/package.json                    cli/
+COPY cli/bin/rep.js                      cli/bin/
+COPY cli/scripts/postinstall.js          cli/scripts/
 COPY codemod/package.json                codemod/
 COPY adapters/react/package.json         adapters/react/
 COPY adapters/vue/package.json           adapters/vue/
