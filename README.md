@@ -141,7 +141,7 @@ RUN npm ci && npm run build
 # Add REP gateway — single binary, ~3MB
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY --from=ghcr.io/rep-protocol/gateway:latest /usr/local/bin/rep-gateway /usr/local/bin/rep-gateway
+COPY --from=ghcr.io/ruachtech/rep/gateway:latest /usr/local/bin/rep-gateway /usr/local/bin/rep-gateway
 
 ENTRYPOINT ["rep-gateway"]
 CMD ["--upstream", "nginx", "--port", "8080"]
@@ -184,9 +184,9 @@ rep.onChange('FEATURE_FLAGS', (newVal) => {   // Hot reload
 
 | Document | Status | Version |
 |---|---|---|
-| [REP-RFC-0001](spec/REP-RFC-0001.md) | **Draft** | 0.1.0 |
-| [Security Model](spec/SECURITY-MODEL.md) | **Draft** | 0.1.0 |
-| [Integration Guide](spec/INTEGRATION-GUIDE.md) | **Draft** | 0.1.0 |
+| [REP-RFC-0001](spec/REP-RFC-0001.md) | **Active** | 0.1.0 |
+| [Security Model](spec/SECURITY-MODEL.md) | **Active** | 0.1.0 |
+| [Integration Guide](spec/INTEGRATION-GUIDE.md) | **Active** | 0.1.0 |
 
 ## Releases & Versioning
 

@@ -8,7 +8,7 @@ Command-line tool for the Runtime Environment Protocol (REP).
 npm install -g @rep-protocol/cli
 ```
 
-The CLI will automatically attempt to bundle the `rep-gateway` binary during installation. If you're in the monorepo, it will build the gateway automatically. Otherwise, it will provide instructions for manual setup.
+The CLI automatically downloads the correct `rep-gateway` binary for your platform from [GitHub Releases](https://github.com/RuachTech/rep/releases) during installation.
 
 Or use with npx:
 
@@ -125,11 +125,9 @@ rep dev --static ./dist --port 8080
 **Binary Resolution:**
 
 The CLI automatically looks for the gateway binary in this order:
-1. Bundled binary (installed during `npm install`)
+1. Bundled binary (downloaded during `npm install`)
 2. Custom path specified with `--gateway-bin`
 3. `rep-gateway` in system PATH
-
-If the binary is not found, the postinstall script will provide instructions for building it manually.
 
 ## Development
 
@@ -137,7 +135,7 @@ Build the CLI from source:
 
 ```bash
 cd cli
-npm install  # This will run postinstall and attempt to bundle the gateway
+npm install  # Downloads the gateway binary for your platform
 npm run build
 ```
 
@@ -149,16 +147,17 @@ node bin/rep.js [command]
 
 ### Manual Gateway Installation
 
-If the automatic bundling fails, you can manually install the gateway binary:
+If the automatic download fails (e.g., in an air-gapped environment), you can install the binary manually:
 
 ```bash
-# Build the gateway
+# Option 1: Build from source
 cd gateway
 make build
+cp bin/rep-gateway ../cli/bin/gateway/
 
-# Run the postinstall script to copy it
-cd ../cli
-node scripts/postinstall.js
+# Option 2: Download manually
+curl -fsSL https://github.com/RuachTech/rep/releases/download/gateway/v0.1.2/rep-gateway_0.1.2_linux_amd64.tar.gz | tar -xz
+mv rep-gateway /usr/local/bin/
 ```
 
 ## License

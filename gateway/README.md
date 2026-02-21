@@ -17,7 +17,31 @@ It reads `REP_*` environment variables at startup, classifies them into PUBLIC /
 
 ## Quick Start
 
-### Build
+### Download Pre-Built Binary
+
+Pre-built binaries for Linux, macOS, and Windows are available on the [Releases page](https://github.com/RuachTech/rep/releases).
+
+```bash
+# macOS (Apple Silicon)
+curl -fsSL https://github.com/RuachTech/rep/releases/download/gateway/v0.1.2/rep-gateway_0.1.2_darwin_arm64.tar.gz | tar -xz
+chmod +x rep-gateway && sudo mv rep-gateway /usr/local/bin/
+
+# macOS (Intel)
+curl -fsSL https://github.com/RuachTech/rep/releases/download/gateway/v0.1.2/rep-gateway_0.1.2_darwin_amd64.tar.gz | tar -xz
+chmod +x rep-gateway && sudo mv rep-gateway /usr/local/bin/
+
+# Linux (amd64)
+curl -fsSL https://github.com/RuachTech/rep/releases/download/gateway/v0.1.2/rep-gateway_0.1.2_linux_amd64.tar.gz | tar -xz
+chmod +x rep-gateway && sudo mv rep-gateway /usr/local/bin/
+```
+
+Or via the **npm CLI** (automatically downloads the correct binary for your platform):
+
+```bash
+npm install -g @rep-protocol/cli
+```
+
+### Build from Source
 
 ```bash
 # Build for your current platform
@@ -43,10 +67,35 @@ REP_SERVER_DB_PASSWORD="secret" \
 
 ### Docker
 
-```bash
-# Build your frontend image with the REP gateway
-docker build -t myapp .
+The gateway is published as a Docker image on the [GitHub Container Registry](https://github.com/RuachTech/rep/pkgs/container/rep%2Fgateway):
 
+```bash
+# Pull the latest release
+docker pull ghcr.io/ruachtech/rep/gateway:latest
+
+# Or a specific version
+docker pull ghcr.io/ruachtech/rep/gateway:v0.1.2
+```
+
+Use it in a multi-stage Dockerfile to add REP to any frontend image:
+
+```dockerfile
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY . .
+RUN npm ci && npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY --from=ghcr.io/ruachtech/rep/gateway:latest /rep-gateway /usr/local/bin/rep-gateway
+
+ENTRYPOINT ["rep-gateway"]
+CMD ["--upstream", "nginx", "--port", "8080"]
+```
+
+Or run the gateway image directly:
+
+```bash
 # Run with different configs — SAME image, different env vars
 docker run -p 8080:8080 \
   -e REP_PUBLIC_API_URL=https://api.staging.example.com \

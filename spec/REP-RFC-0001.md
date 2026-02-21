@@ -3,7 +3,7 @@
 ```
 Title:    Runtime Environment Protocol (REP)
 Version:  0.1.0
-Status:   Draft
+Status:   Active
 Authors:  Olamide Adebayo (Ruach Tech)
 Created:  2026-02-18
 Updated:  2026-02-21

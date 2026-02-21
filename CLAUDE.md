@@ -6,7 +6,7 @@
 **Organisation:** Ruach Tech (`github.com/ruachtech`)
 **Author:** Olamide Adebayo
 **License:** Spec documents under CC BY 4.0, code under Apache 2.0
-**Status:** Pre-release — all packages implemented, CI/CD in place, pending first public release
+**Status:** v0.1.x released — gateway `v0.1.2`, npm packages `v0.1.3`. CI/CD pipeline operational. Spec status: Active.
 
 ---
 
@@ -57,7 +57,7 @@ rep/
 │   ├── .goreleaser.yml                # Multi-platform release config
 │   ├── Dockerfile                     # Multi-stage, FROM scratch final
 │   ├── Makefile
-│   ├── VERSION                        # "0.1.0"
+│   ├── VERSION                        # "0.1.2"
 │   ├── go.mod                         # Go 1.24.5, zero external deps
 │   ├── cmd/rep-gateway/
 │   │   └── main.go                    # Entrypoint: flags, signals, graceful shutdown
@@ -94,18 +94,19 @@ rep/
 │   │   └── payload_test.go
 │   └── testdata/static/
 │       └── index.html
+│   └── LICENSE                        # Symlink → ../LICENSE (for GoReleaser archives)
 │
 ├── sdk/                               # @rep-protocol/sdk (zero runtime deps)
-│   ├── package.json                   # v0.1.2
+│   ├── package.json                   # v0.1.3
 │   ├── src/
 │   │   ├── index.ts                   # get(), getSecure(), onChange(), verify(), meta()
 │   │   └── __tests__/index.test.ts    # 24 tests
 │   └── vitest.config.ts
 │
 ├── cli/                               # @rep-protocol/cli
-│   ├── package.json                   # v0.1.1
+│   ├── package.json                   # v0.1.3; includes "gatewayVersion" field (auto-bumped by release-please on gateway releases)
 │   ├── bin/rep.js                     # Executable entry
-│   ├── scripts/postinstall.js         # Copies gateway binary per OS
+│   ├── scripts/postinstall.js         # Downloads pre-built gateway binary from GitHub Releases
 │   └── src/
 │       ├── commands/
 │       │   ├── dev.ts                 # Dev server (wraps gateway)
@@ -128,6 +129,7 @@ rep/
 └── examples/
     ├── .rep.yaml                      # Example manifest
     └── todo-react/                    # Full React todo app with REP gateway
+        └── Dockerfile                 # Downloads pre-built gateway binary from GitHub Releases (alpine + curl)
 ```
 
 ---
@@ -235,6 +237,11 @@ Full threat analysis in `spec/SECURITY-MODEL.md`.
 | **Hot reload via SSE (not WebSocket)** | Simpler, auto-reconnects, works through most proxies, sufficient for one-directional config push. |
 | **pnpm monorepo** | Single lockfile, workspace linking, strict dependency resolution. All TS packages in one repo. |
 | **release-please** | Conventional-commit-driven releases, independent versioning per package, automated changelogs. |
+| **`gatewayVersion` in `cli/package.json`** | release-please auto-bumps this field via `extra-files` jsonpath config whenever a gateway release is created. Keeps CLI and gateway versions in sync without manual intervention. |
+| **`gateway/LICENSE` symlink** | GoReleaser's archiver blocks `../` path traversal. A committed symlink (`gateway/LICENSE → ../LICENSE`) satisfies both GoReleaser and the zero-dirty-tree requirement without copying files in CI. |
+| **`postinstall.js` downloads from GitHub Releases** | Replaces the previous approach of building from source (monorepo) or printing instructions. Fetches the correct platform archive via native Node.js `https` module (`agent: false` to avoid 30s keep-alive hang). Falls back to local monorepo binary if present. |
+| **GoReleaser temp tag in CI** | `monorepo.tag_prefix` is GoReleaser Pro-only. Free-tier workaround: `git tag v0.1.x` (temp, never pushed) in CI before GoReleaser runs so its git validation passes. `GORELEASER_CURRENT_TAG=gateway/v0.1.x` points to the real remote tag. |
+| **`changelog.use: git`** | Avoids GitHub API 404 that occurs when the bare `vX.Y.Z` tag only exists locally in CI. The `git` changelog reads local git log directly. |
 
 ---
 
