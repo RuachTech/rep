@@ -3,8 +3,8 @@
   "release-type": "node",
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
-  "group-pull-request-title-pattern": "chore${scope}: release ${component}",
-  "pull-request-title-pattern": "chore${scope}: release ${component}",
+  "group-pull-request-title-pattern": "chore${scope}: release ${component} ${version}",
+  "pull-request-title-pattern": "chore${scope}: release ${component} ${version}",
   "include-component-in-tag": false,
   "plugins": [
     {
