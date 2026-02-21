@@ -6,7 +6,7 @@ Version:  0.1.0
 Status:   Draft
 Authors:  Olamide Adebayo (Ruach Tech)
 Created:  2026-02-18
-Updated:  2026-02-18
+Updated:  2026-02-21
 License:  CC BY 4.0
 ```
 
@@ -142,22 +142,28 @@ The gateway serves static files directly from a configured directory, eliminatin
 On process start, the gateway MUST perform the following steps in order:
 
 ```
-1. READ all environment variables matching REP_* prefix
-2. CLASSIFY each variable into PUBLIC, SENSITIVE, or SERVER tier
-3. VALIDATE uniqueness of variable names after prefix stripping
-4. RUN secret detection guardrails on PUBLIC tier variables
-5. IF --strict AND guardrails triggered → EXIT with error
-6. GENERATE ephemeral encryption key pair for SENSITIVE tier
-7. ENCRYPT all SENSITIVE tier values using AES-256-GCM
-8. COMPUTE HMAC-SHA256 integrity token over the PUBLIC + SENSITIVE payload
-9. CONSTRUCT the REP payload JSON object
-10. REGISTER HTTP handlers for:
+1.  IF --env-file specified → READ and parse the .env file, merging
+    variables into the process environment (existing env vars take precedence)
+2.  READ all environment variables matching REP_* prefix
+3.  CLASSIFY each variable into PUBLIC, SENSITIVE, or SERVER tier
+4.  VALIDATE uniqueness of variable names after prefix stripping
+5.  IF --manifest specified → LOAD the .rep.yaml manifest and validate
+    all declared variables against the environment (required vars present,
+    types match, patterns match). On validation failure → EXIT with error.
+6.  RUN secret detection guardrails on PUBLIC tier variables
+7.  IF --strict AND guardrails triggered → EXIT with error
+8.  GENERATE ephemeral master key, derive AES-256 encryption key via
+    HKDF-SHA256 (see §8.2), and generate HMAC-SHA256 secret
+9.  ENCRYPT all SENSITIVE tier values using AES-256-GCM
+10. COMPUTE HMAC-SHA256 integrity token over the PUBLIC + SENSITIVE payload
+11. CONSTRUCT the REP payload JSON object
+12. REGISTER HTTP handlers for:
     - HTML injection (all text/html responses)
     - Session key endpoint (/rep/session-key)
     - Health check endpoint (/rep/health)
     - Hot reload SSE endpoint (/rep/changes) [if enabled]
-11. START accepting connections
-12. LOG startup summary: variable counts per tier, any guardrail warnings
+13. START accepting connections
+14. LOG startup summary: variable counts per tier, any guardrail warnings
 ```
 
 ### 4.3 HTML Injection
@@ -203,23 +209,26 @@ The injected block MUST have the following structure:
 This endpoint issues short-lived decryption keys for `SENSITIVE` tier variables.
 
 **Request requirements:**
-- MUST include an `Origin` header matching the configured allowed origins.
-- MUST include a `Referer` header from the same origin.
+- MUST include an `Origin` header matching the configured allowed origins (if origins are configured). If no allowed origins are configured, same-origin requests (empty or absent `Origin` header) are permitted.
 
 **Response:**
 ```json
 {
-  "key": "{base64_encoded_aes_key}",
+  "key": "{base64_encoded_derived_aes_key}",
   "expires_at": "2026-02-18T14:30:30.000Z",
   "nonce": "{base64_encoded_nonce}"
 }
 ```
 
+- **`key`**: The HKDF-derived AES-256 encryption key (see §8.2), base64-encoded. This is the derived key, not the master key material.
+- **`expires_at`**: RFC 3339 timestamp indicating when this key issuance expires.
+- **`nonce`**: A 16-byte cryptographically random value, base64-encoded, generated fresh per request. Ensures each response is unique even within the same key's TTL window.
+
 **Security constraints:**
 - Keys MUST expire within 30 seconds of issuance.
-- Keys MUST be single-use. The gateway tracks issued keys and rejects reuse.
+- The gateway MUST track issued keys internally for audit and expiry purposes.
 - The endpoint MUST be rate-limited to 10 requests per minute per client IP.
-- The endpoint MUST NOT be cacheable (`Cache-Control: no-store`).
+- The endpoint MUST NOT be cacheable (`Cache-Control: no-store, no-cache, must-revalidate`).
 - CORS policy MUST restrict to configured origins only.
 
 ### 4.5 Health Check Endpoint
@@ -499,6 +508,7 @@ Flags:
   --port            Listen port (default: 8080)
   --static-dir      Static file directory (embedded mode only, default: "/usr/share/nginx/html")
   --manifest        Path to .rep.yaml manifest file (optional)
+  --env-file        Path to .env file to load variables from (optional, env vars take precedence)
   --strict          Exit on guardrail warnings (default: false)
   --hot-reload      Enable hot reload SSE endpoint (default: false)
   --hot-reload-mode Hot reload detection mode: file_watch, signal, poll (default: signal)
@@ -597,10 +607,24 @@ The `sensitive` field contains a base64-encoded binary blob with the following s
 ```
 
 - **Algorithm:** AES-256-GCM
-- **Key:** Ephemeral, generated at gateway startup, rotated on restart.
+- **Key:** Derived via HKDF-SHA256 (RFC 5869) at gateway startup, rotated on restart. See §8.2.1.
 - **Nonce:** 12-byte random, generated per encryption operation.
 - **Plaintext format:** JSON object `{"KEY": "value", ...}` containing all SENSITIVE tier variables.
 - **Associated data (AAD):** The `_meta.integrity` value, binding the encrypted blob to the integrity token.
+
+#### 8.2.1 Key Derivation
+
+The AES-256 encryption key MUST be derived using HKDF-SHA256 (RFC 5869), not used directly from the random number generator. The derivation process is:
+
+1. **Generate master key:** 32 bytes from a cryptographic RNG. This is the HKDF Input Key Material (IKM).
+2. **Generate startup salt:** 32 bytes from a cryptographic RNG. Mixed into HKDF-Extract for domain separation and per-restart uniqueness.
+3. **Extract:** `PRK = HMAC-SHA256(key=startupSalt, message=masterKey)`
+4. **Expand:** `EncryptionKey = HMAC-SHA256(key=PRK, message="rep-blob-encryption-v1" || 0x01)`
+5. **Discard master key and salt.** Neither value is stored or returned — only the 32-byte derived key is retained in memory.
+
+The `info` string `"rep-blob-encryption-v1"` provides domain separation, allowing future key hierarchy expansion (e.g., deriving additional keys with different `info` strings) without protocol changes.
+
+The HMAC secret used for integrity computation (§8.3) is generated independently — it is NOT derived from the same master key.
 
 ### 8.3 Integrity Computation
 
@@ -807,6 +831,7 @@ This document has no IANA actions. The `__rep__` identifier and `/rep/*` endpoin
 
 - [The Twelve-Factor App - Factor III: Config](https://12factor.net/config)
 - [OCI Image Specification](https://github.com/opencontainers/image-spec)
+- [RFC 5869 - HMAC-based Extract-and-Expand Key Derivation Function (HKDF)](https://tools.ietf.org/html/rfc5869)
 - [RFC 7519 - JSON Web Token (JWT)](https://tools.ietf.org/html/rfc7519)
 - [Web Crypto API - SubtleCrypto](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto)
 - [Subresource Integrity (SRI)](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity)
