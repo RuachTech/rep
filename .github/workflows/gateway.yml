@@ -2,6 +2,7 @@ name: Gateway CI
 
 on:
   push:
+    branches: [main]
     paths:
       - 'gateway/**'
       - '.github/workflows/gateway.yml'
