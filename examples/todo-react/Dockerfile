@@ -18,7 +18,7 @@
 FROM --platform=$BUILDPLATFORM golang:1.24.5-alpine AS gateway
 
 ARG TARGETOS=linux
-ARG TARGETARCH=arm64
+ARG TARGETARCH=amd64
 
 WORKDIR /src
 COPY gateway/go.mod ./
