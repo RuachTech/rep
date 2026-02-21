@@ -18,6 +18,7 @@ _test/
 **/dist/
 **/*.tsbuildinfo
 **/coverage/
+**/cli/bin/gateway/
 
 # Package manager lock files (keep pnpm-lock.yaml, ignore npm/yarn)
 package-lock.json
