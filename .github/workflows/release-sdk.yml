@@ -37,7 +37,7 @@ jobs:
             fi
           done
 
-          for token in '${scope}' '${component}' '${version}'; do
+          for token in '${scope}' '${version}'; do
             if [[ "$group_pattern" != *"$token"* ]]; then
               echo "::error::group-pull-request-title-pattern must include $token"
               exit 1
