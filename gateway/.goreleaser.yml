@@ -35,7 +35,8 @@ archives:
           - zip
     name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
     files:
-      - LICENSE
+      - src: ../LICENSE
+        dst: LICENSE
       - README.md
 
 checksum:
