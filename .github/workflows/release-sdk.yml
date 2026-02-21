@@ -31,6 +31,7 @@ jobs:
       paths_released: ${{ steps.resolve.outputs.paths_released }}
       gateway_release_created: ${{ steps.resolve.outputs.gateway_release_created }}
       gateway_tag_name: ${{ steps.resolve.outputs.gateway_tag_name }}
+      npm_publish: ${{ steps.resolve.outputs.npm_publish }}
     steps:
       - uses: actions/checkout@v4
 
@@ -69,23 +70,26 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             GATEWAY_TAG="${{ inputs.gateway_tag }}"
             GATEWAY_RELEASE_CREATED=$([[ -n "$GATEWAY_TAG" ]] && echo "true" || echo "")
-            RELEASES_CREATED=$([[ "${{ inputs.republish_npm }}" == "true" || -n "$GATEWAY_TAG" ]] && echo "true" || echo "")
+            NPM_PUBLISH=$([[ "${{ inputs.republish_npm }}" == "true" ]] && echo "true" || echo "")
+            RELEASES_CREATED=$([[ -n "$GATEWAY_RELEASE_CREATED" || -n "$NPM_PUBLISH" ]] && echo "true" || echo "")
             echo "releases_created=${RELEASES_CREATED}" >> "$GITHUB_OUTPUT"
             echo "paths_released=" >> "$GITHUB_OUTPUT"
             echo "gateway_release_created=${GATEWAY_RELEASE_CREATED}" >> "$GITHUB_OUTPUT"
             echo "gateway_tag_name=${GATEWAY_TAG}" >> "$GITHUB_OUTPUT"
+            echo "npm_publish=${NPM_PUBLISH}" >> "$GITHUB_OUTPUT"
           else
             echo "releases_created=${{ steps.release.outputs.releases_created }}" >> "$GITHUB_OUTPUT"
             echo "paths_released=${{ steps.release.outputs.paths_released }}" >> "$GITHUB_OUTPUT"
             echo "gateway_release_created=${{ steps.release.outputs['gateway--release_created'] }}" >> "$GITHUB_OUTPUT"
             echo "gateway_tag_name=${{ steps.release.outputs['gateway--tag_name'] }}" >> "$GITHUB_OUTPUT"
+            echo "npm_publish=${{ steps.release.outputs.releases_created }}" >> "$GITHUB_OUTPUT"
           fi
 
   publish-npm:
     name: Publish to npm
     runs-on: ubuntu-latest
     needs: release-please
-    if: needs.release-please.outputs.releases_created == 'true'
+    if: needs.release-please.outputs.npm_publish == 'true'
 
     steps:
       - uses: actions/checkout@v4
