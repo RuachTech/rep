@@ -14,21 +14,21 @@
 #     -e REP_SENSITIVE_ANALYTICS_KEY=ak_demo_abc123 \
 #     rep-todo
 
-# ── Stage 1: Build the REP Gateway ─────────────────────────────────────────────
-FROM --platform=$BUILDPLATFORM golang:1.24.5-alpine AS gateway
+# ── Stage 1: Download pre-built REP Gateway binary ────────────────────────────
+FROM alpine:3.21 AS gateway
 
-ARG TARGETOS=linux
+# Match the gatewayVersion field in cli/package.json.
+ARG GATEWAY_VERSION=0.1.2
 ARG TARGETARCH=amd64
 
-WORKDIR /src
-COPY gateway/go.mod ./
-RUN go mod download
-COPY gateway/ .
-RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
-    -trimpath \
-    -ldflags="-s -w" \
-    -o /rep-gateway \
-    ./cmd/rep-gateway
+RUN apk add --no-cache curl ca-certificates && \
+    ARCHIVE="rep-gateway_${GATEWAY_VERSION}_linux_${TARGETARCH}.tar.gz" && \
+    curl -fsSL \
+      "https://github.com/RuachTech/rep/releases/download/v${GATEWAY_VERSION}/${ARCHIVE}" \
+      -o /tmp/gateway.tar.gz && \
+    tar -xzf /tmp/gateway.tar.gz -C /tmp && \
+    mv /tmp/rep-gateway /rep-gateway && \
+    chmod +x /rep-gateway
 
 # ── Stage 2: Build the React app ───────────────────────────────────────────────
 FROM node:20-alpine AS app
