@@ -3,7 +3,6 @@
   "release-type": "node",
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
-  "separate-pull-requests": true,
   "group-pull-request-title-pattern": "chore${scope}: release ${version}",
   "pull-request-title-pattern": "chore${scope}: release ${component} ${version}",
   "include-component-in-tag": true,
@@ -43,6 +42,7 @@
     "gateway": {
       "release-type": "simple",
       "component": "gateway",
+      "separate-pull-requests": true,
       "include-component-in-tag": true,
       "tag-separator": "/",
       "extra-files": [
