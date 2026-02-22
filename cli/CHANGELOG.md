@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/RuachTech/rep/compare/cli-v0.1.3...cli-v0.1.4) (2026-02-22)
+
+
+### Bug Fixes
+
+* **cli:** update gateway version handling and postinstall script for improved binary installation ([dd0f714](https://github.com/RuachTech/rep/commit/dd0f714f2bf1f24279cc5df5ec990bbcfe394302))
+
 ## [0.1.3](https://github.com/RuachTech/rep/compare/cli-v0.1.1...cli-v0.1.3) (2026-02-21)
 
 
