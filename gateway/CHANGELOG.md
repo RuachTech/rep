@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.3](https://github.com/RuachTech/rep/compare/gateway/v0.1.2...gateway/v0.1.3) (2026-02-22)
+
+
+### Bug Fixes
+
+* copy LICENSE file into gateway directory and update GoReleaser config ([12ec03f](https://github.com/RuachTech/rep/commit/12ec03fd0078a68bfe28ed81906eae7c5152e653))
+* update changelog source in GoReleaser configuration from github to git ([a9fef2b](https://github.com/RuachTech/rep/commit/a9fef2bf7c73a122a18867fda54deb3d4e5882ed))
+* update name_template in GoReleaser configuration to include version ([4a6b3f2](https://github.com/RuachTech/rep/commit/4a6b3f2c771bf9b4cd29db7dfeda21ddcbb47c74))
+
 ## [0.1.2](https://github.com/RuachTech/rep/compare/gateway/v0.1.1...gateway/v0.1.2) (2026-02-21)
 
 

@@ -2,7 +2,7 @@
   "name": "@rep-protocol/cli",
   "version": "0.1.3",
   "description": "CLI tool for the Runtime Environment Protocol (REP).",
-  "gatewayVersion": "0.1.2",
+  "gatewayVersion": "0.1.3",
   "bin": {
     "rep": "./bin/rep.js"
   },
