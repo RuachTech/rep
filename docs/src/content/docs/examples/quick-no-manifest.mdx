@@ -84,6 +84,31 @@ REP_PUBLIC_FEATURE_FLAGS=dark-mode \
 
 Same `dist/` folder. Different runtime config.
 
+### Dev mode — file watch hot reload
+
+For local development, point the gateway at a `.env.local` file and let it watch for changes automatically — no signals, no restarts:
+
+```bash
+# .env.local
+REP_PUBLIC_API_URL=http://localhost:3001
+REP_PUBLIC_FEATURE_FLAGS=dark-mode
+REP_SENSITIVE_ANALYTICS_KEY=ak_dev_abc123
+```
+
+```bash
+./rep-gateway --mode embedded --static-dir ./dist \
+  --hot-reload \
+  --hot-reload-mode=file_watch \
+  --env-file=.env.local \
+  --watch-path=.env.local
+```
+
+Edit `.env.local` and save — the gateway picks up the changes immediately, re-encrypts sensitive vars with a fresh ephemeral key, and pushes a reload event over `/rep/changes` (SSE). Components using `rep.onChange()` re-render automatically without a browser refresh.
+
+<Aside type="tip">
+  The CLI dev command handles this automatically: `npx @rep-protocol/cli dev --proxy http://localhost:5173` starts the gateway with file watch mode already enabled. See the [Local Development guide](/guides/development/).
+</Aside>
+
 ## When to add a manifest
 
 The manifest is additive. Add it when you need:
