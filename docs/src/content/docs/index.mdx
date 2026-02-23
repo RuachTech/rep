@@ -1,9 +1,9 @@
 ---
 title: REP — Runtime Environment Protocol
-description: Build once. Configure anywhere. Securely. Inject environment variables into browser apps at container runtime.
+description: Build once. Deploy anywhere. Securely. The missing security layer for environment variables in browser applications.
 template: splash
 hero:
-  tagline: Inject environment variables into browser apps at container runtime — with security classification, encryption, and integrity verification.
+  tagline: The missing security layer for environment variables in browser applications. Build once, deploy anywhere — with encryption, integrity verification, and secret detection built in.
   actions:
     - text: Quick Start
       link: /quick-start/
@@ -17,52 +17,79 @@ hero:
 
 import { Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
 
+<div style="max-width: 720px; margin: 0 auto 2rem;">
+  <video controls playsinline preload="metadata" style="width: 100%; border-radius: 8px; border: 1px solid var(--sl-color-gray-5);">
+    <source src="https://github.com/RuachTech/rep/releases/download/v0.1.3/rep-gateway-demo.mp4" type="video/mp4" />
+  </video>
+  <p style="text-align: center; font-size: 0.85rem; color: var(--sl-color-gray-3); margin-top: 0.5rem;">Hot reload and feature flags — no rebuild, no redeploy.</p>
+</div>
+
 ## The Problem
 
-Every frontend framework resolves environment variables at **build time** via static string replacement. The resulting bundle is environment-specific — a bundle built for staging cannot be reused in production without rebuilding.
-
-> **Containers are designed to be environment-agnostic artifacts, but frontend builds are environment-specific artifacts.**
-
-This means: one image per environment, broken CI/CD promotion, config changes require redeployment, and no security model for variables.
-
-## What REP Does Differently
-
-REP operates at the **infrastructure layer** — no build-tool plugins, no framework coupling. A lightweight Go gateway binary reads environment variables at container startup, classifies them by security tier, and injects them into HTML responses.
+Every frontend framework resolves environment variables at **build time** — `process.env.API_URL` becomes a hardcoded string in your JavaScript bundle. This creates problems that compound in production:
 
 <CardGrid>
-  <Card title="Security Classification" icon="approve-check">
-    Three tiers: PUBLIC (plaintext), SENSITIVE (encrypted), SERVER (never sent). Prefix-based — no ambiguity.
+  <Card title="One build per environment" icon="warning">
+    Your staging bundle can't be promoted to production. You rebuild for every environment, breaking the container promise of "build once, run anywhere."
   </Card>
-  <Card title="Encrypted Variables" icon="lock">
-    Sensitive vars are AES-256-GCM encrypted. Decrypted via single-use, rate-limited session keys.
+  <Card title="No security model" icon="error">
+    All variables are treated equally. API keys, analytics tokens, and public URLs all end up as plaintext strings in your bundle — visible to anyone who opens View Source.
   </Card>
-  <Card title="Integrity Verification" icon="shield">
-    HMAC-SHA256 integrity token + SRI hashing on every payload. Detect tampering in transit.
+  <Card title="Config changes require redeployment" icon="close">
+    Need to rotate an API key or flip a feature flag? Rebuild, re-test, redeploy. Even if your backend can hot-swap config, your frontend can't.
   </Card>
-  <Card title="Hot Reload" icon="refresh">
-    Config changes push to the browser via SSE — no page reload, no redeployment.
+  <Card title="Secrets leak into build logs" icon="error">
+    CI/CD pipelines pass secrets as build args. They appear in Docker layer history, build logs, and cached artifacts — creating supply chain risk.
+  </Card>
+</CardGrid>
+
+## What REP Does
+
+REP is an open protocol and reference implementation that **decouples environment variables from the build process entirely**. A lightweight gateway reads variables at startup, classifies them by security tier, encrypts sensitive values, and injects them into HTML responses — whether you're running containers, static builds, or local development.
+
+<CardGrid>
+  <Card title="Three Security Tiers" icon="approve-check">
+    **PUBLIC** — plaintext, synchronous access. **SENSITIVE** — AES-256-GCM encrypted, decrypted on demand. **SERVER** — never sent to the browser. Classification by naming convention eliminates ambiguity.
+  </Card>
+  <Card title="Encryption + Integrity" icon="lock">
+    Sensitive variables are encrypted with ephemeral keys generated at startup. Every payload carries an HMAC-SHA256 integrity token and SRI hash to detect tampering in transit.
+  </Card>
+  <Card title="Secret Detection Guardrails" icon="shield">
+    Entropy analysis and known-format matching (AWS keys, JWTs, Stripe keys, GitHub tokens) catch misclassified secrets before they reach the browser. Strict mode makes warnings into hard failures.
+  </Card>
+  <Card title="Hot Reload via SSE" icon="refresh">
+    Config changes push to every connected browser via Server-Sent Events. No page reload, no redeployment. Edit an env file or rotate a ConfigMap — the UI updates live.
+  </Card>
+</CardGrid>
+
+## Works Everywhere
+
+REP operates at the **infrastructure layer** — no build-tool plugins, no framework coupling. It works with any frontend stack that produces HTML.
+
+<CardGrid>
+  <Card title="Containers" icon="rocket">
+    Reverse proxy mode sits in front of nginx, caddy, or any upstream. Embedded mode serves static files directly from a `FROM scratch` image (~3MB).
+  </Card>
+  <Card title="Static Builds" icon="document">
+    Build your app once with `npm run build`. The gateway injects config into the static HTML at serve time — same artifact for every environment.
+  </Card>
+  <Card title="Local Development" icon="terminal">
+    The CLI wraps the gateway for local dev. Proxy your Vite/webpack dev server with hot reload, or serve a production build with live config changes.
+  </Card>
+  <Card title="Any Framework" icon="puzzle">
+    First-party adapters for React, Vue, and Svelte. A zero-dependency TypeScript SDK works with anything — Angular, vanilla JS, or your custom setup.
   </Card>
 </CardGrid>
 
 ## Compared to Existing Solutions
 
-| Approach | Security Model | Encrypted Vars | Integrity Check | Framework Agnostic | Standalone Binary |
+| Approach | Security Tiers | Encrypted Vars | Integrity Check | Hot Reload | Standalone Binary |
 |---|:---:|:---:|:---:|:---:|:---:|
-| `envsubst` / `sed` on bundles | -- | -- | -- | Yes | -- |
-| Fetch `/config.json` | -- | -- | -- | Yes | -- |
-| `window.__ENV__` via shell script | -- | -- | -- | Partial | -- |
-| Build-tool plugins | -- | -- | -- | -- | -- |
-| **REP** | **3-tier** | **AES-256-GCM** | **HMAC + SRI** | **Yes** | **~3MB Go** |
-
-## How It Works
-
-```
-Container boot → Gateway reads REP_* env vars → Classifies → Encrypts sensitive → Signs payload
-
-Request: Browser → [REP Gateway :8080] → [Upstream :80]
-         HTML responses get <script id="__rep__"> injected before </head>
-         All other responses pass through unmodified
-```
+| `envsubst` / `sed` on bundles | -- | -- | -- | -- | -- |
+| Fetch `/config.json` at runtime | -- | -- | -- | -- | -- |
+| `window.__ENV__` via shell script | -- | -- | -- | -- | -- |
+| Build-tool plugins (dotenv, etc.) | -- | -- | -- | -- | -- |
+| **REP** | **3-tier** | **AES-256-GCM** | **HMAC + SRI** | **SSE** | **~3MB Go** |
 
 ## Quick Example
 
@@ -75,10 +102,10 @@ import { rep } from '@rep-protocol/sdk';
 const apiUrl = rep.get('API_URL');
 const flags = rep.get('FEATURE_FLAGS');
 
-// Encrypted — decrypted on demand
+// Encrypted — decrypted on demand via session key
 const key = await rep.getSecure('ANALYTICS_KEY');
 
-// Hot reload — react to config changes
+// Hot reload — react to config changes live
 rep.onChange('FEATURE_FLAGS', (newValue) => {
   console.log('Flags updated:', newValue);
 });
@@ -86,7 +113,7 @@ rep.onChange('FEATURE_FLAGS', (newValue) => {
   </TabItem>
   <TabItem label="Docker Compose">
 ```yaml
-# Same image, different config
+# Same image, different config — true build-once, deploy-anywhere
 services:
   frontend-staging:
     image: myapp:latest
@@ -108,7 +135,7 @@ services:
 # PUBLIC — plaintext in page source, rep.get()
 REP_PUBLIC_API_URL=https://api.example.com
 
-# SENSITIVE — encrypted, await rep.getSecure()
+# SENSITIVE — AES-256-GCM encrypted, await rep.getSecure()
 REP_SENSITIVE_ANALYTICS_KEY=UA-12345-1
 
 # SERVER — never leaves the gateway process
@@ -130,7 +157,7 @@ REP_SERVER_DB_PASSWORD=never-reaches-browser
     `rep validate`, `rep typegen`, `rep lint`, `rep dev`. Full development workflow.
   </Card>
   <Card title="Adapters" icon="puzzle">
-    First-party React, Vue, and Svelte adapters with hot-reload-aware hooks/stores.
+    First-party React, Vue, and Svelte adapters with hot-reload-aware hooks and stores.
   </Card>
 </CardGrid>
 

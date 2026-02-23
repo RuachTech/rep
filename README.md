@@ -4,6 +4,8 @@
 
 REP is an open specification and reference implementation for injecting environment variables into browser-hosted applications at runtime — with security classification, integrity verification, and zero build-tool coupling.
 
+[**Watch the demo**](https://github.com/RuachTech/rep/releases/download/v0.1.3/rep-gateway-demo.mp4) — hot reload and feature flags without rebuilding.
+
 ---
 
 ## The Problem

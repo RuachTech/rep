@@ -6,8 +6,13 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'REP',
+      logo: {
+        light: './src/assets/logo-light.jpg',
+        dark: './src/assets/logo-dark.jpg',
+        replacesTitle: true,
+      },
       description:
-        'Runtime Environment Protocol — Inject environment variables into browser apps at container runtime. Secure by design.',
+        'Runtime Environment Protocol — Securely deliver environment variables to browser apps at runtime. No rebuilds, no secrets in bundles.',
       social: [
         {
           icon: 'github',
