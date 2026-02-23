@@ -1,0 +1,48 @@
+---
+title: Conformance
+description: Requirements for REP-conformant gateway and SDK implementations.
+---
+
+An implementation is **REP-conformant** if it satisfies the requirements below. This page is extracted from REP-RFC-0001 Section 11.
+
+## Gateway conformance (MUST)
+
+A conformant gateway implementation MUST:
+
+1. Read only `REP_*` prefixed environment variables
+2. Classify variables into exactly three tiers based on prefix (`PUBLIC`, `SENSITIVE`, `SERVER`)
+3. Strip the classification prefix from variable names in the payload
+4. Reject startup if variable names collide after prefix stripping
+5. Run secret detection guardrails on PUBLIC tier variables
+6. Inject a `<script id="__rep__" type="application/json">` block into HTML responses
+7. Compute and include an HMAC-SHA256 integrity token
+8. Encrypt SENSITIVE tier variables using AES-256-GCM
+9. Issue single-use, time-limited session keys via `/rep/session-key`
+10. Never transmit SERVER tier variables to the client under any circumstances
+
+## Client SDK conformance (MUST)
+
+A conformant SDK implementation MUST:
+
+1. Read from `<script id="__rep__">` synchronously on import
+2. Verify payload integrity on initialization (SRI hash)
+3. Expose `get()` as a synchronous function
+4. Expose `getSecure()` as an async function
+5. Make no network calls during initialization
+6. Freeze the public variable object to prevent mutation
+
+## Optional features (MAY)
+
+Conformant implementations MAY implement:
+
+1. Hot reload via Server-Sent Events
+2. Manifest file validation at startup
+3. TypeScript type generation from manifest
+4. Framework-specific adapters (React hooks, Vue composables, Svelte stores)
+5. Codemod tooling for migration
+
+## Notes
+
+- "MUST", "SHOULD", and "MAY" follow [RFC 2119](https://tools.ietf.org/html/rfc2119) conventions
+- The reference implementation (gateway in Go, SDK in TypeScript) satisfies all MUST requirements and implements all optional features
+- Alternative implementations need only satisfy the MUST requirements to be conformant

@@ -1,0 +1,55 @@
+---
+title: Vue Adapter API
+description: API reference for @rep-protocol/vue composables.
+---
+
+```bash
+npm install @rep-protocol/vue @rep-protocol/sdk
+```
+
+## `useRep(key, defaultValue?)`
+
+```typescript
+function useRep(key: string, defaultValue?: string): Ref<string | undefined>;
+```
+
+Reads a PUBLIC tier variable as a reactive `Ref`.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `key` | `string` | Variable name |
+| `defaultValue` | `string` | Optional fallback value |
+
+**Returns:** `Ref<string | undefined>`
+
+**Behavior:**
+- Set immediately from the injected payload
+- Subscribes to hot reload on creation
+- Unsubscribes via `onUnmounted`
+- Must be called inside `setup()`
+
+## `useRepSecure(key)`
+
+```typescript
+function useRepSecure(key: string): Ref<string | null>;
+```
+
+Reads a SENSITIVE tier variable as a reactive `Ref`.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `key` | `string` | Variable name |
+
+**Returns:** `Ref<string | null>`
+
+**Behavior:**
+- Starts as `null`
+- Resolves after session key fetch and decryption
+- Errors are swallowed (SDK logs them); ref stays `null`
+- Does **not** subscribe to hot reload
+
+## Requirements
+
+- Vue >= 3.0
+- `@rep-protocol/sdk` peer dependency
+- Must be called from `setup()` for `onUnmounted` cleanup

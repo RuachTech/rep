@@ -1,0 +1,119 @@
+---
+title: Quick Start
+description: Get REP running in under 5 minutes — no manifest file, no configuration step.
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+The `.rep.yaml` manifest is entirely optional. The gateway works with just environment variables — the naming convention **is** the configuration.
+
+<Steps>
+
+1. **Rename your environment variables**
+
+   Add the `REP_PUBLIC_`, `REP_SENSITIVE_`, or `REP_SERVER_` prefix to classify each variable:
+
+   ```bash
+   # Before (Vite)            → After (REP)
+   VITE_API_URL               → REP_PUBLIC_API_URL
+   VITE_FEATURE_FLAGS         → REP_PUBLIC_FEATURE_FLAGS
+
+   # Before (CRA)             → After (REP)
+   REACT_APP_API_URL          → REP_PUBLIC_API_URL
+
+   # Should be encrypted in the browser
+   REACT_APP_ANALYTICS_KEY    → REP_SENSITIVE_ANALYTICS_KEY
+
+   # Should never reach the browser
+   DB_PASSWORD                → REP_SERVER_DB_PASSWORD
+   ```
+
+2. **Install the SDK and update your code**
+
+   ```bash
+   npm install @rep-protocol/sdk
+   ```
+
+   Replace your `import.meta.env.*` / `process.env.*` reads:
+
+   ```typescript
+   import { rep } from '@rep-protocol/sdk';
+
+   // Was: import.meta.env.VITE_API_URL
+   const apiUrl = rep.get('API_URL');
+
+   // With a default value for local development
+   const apiUrl = rep.get('API_URL', 'http://localhost:3001');
+
+   // Sensitive variable — encrypted, decrypted on demand
+   const key = await rep.getSecure('ANALYTICS_KEY');
+   ```
+
+   `rep.get()` is **synchronous** — the SDK reads the payload from the DOM on import, before your first component renders. No loading state needed.
+
+3. **Build your app (nothing changes)**
+
+   ```bash
+   npm run build
+   ```
+
+   The output is now environment-agnostic. The same `dist/` folder goes to every environment.
+
+4. **Run the gateway**
+
+   <Tabs>
+     <TabItem label="Binary">
+     ```bash
+     REP_PUBLIC_API_URL=https://api.example.com \
+     REP_PUBLIC_FEATURE_FLAGS=dark-mode,new-checkout \
+     REP_SENSITIVE_ANALYTICS_KEY=ak_live_abc123 \
+     ./rep-gateway --mode embedded --static-dir ./dist
+     ```
+     </TabItem>
+     <TabItem label="Docker">
+     ```bash
+     docker run --rm -p 8080:8080 \
+       -e REP_PUBLIC_API_URL=https://api.example.com \
+       -e REP_PUBLIC_FEATURE_FLAGS=dark-mode,new-checkout \
+       -e REP_SENSITIVE_ANALYTICS_KEY=ak_live_abc123 \
+       -v "$(pwd)/dist:/static:ro" \
+       ghcr.io/ruachtech/rep/gateway:latest \
+       --mode embedded --static-dir /static
+     ```
+     </TabItem>
+   </Tabs>
+
+   Open `http://localhost:8080` — the gateway injected your variables into every HTML response.
+
+</Steps>
+
+## Changing config without rebuilding
+
+Stop the gateway. Restart with different values. Same `dist/` folder, different runtime config:
+
+```bash
+REP_PUBLIC_API_URL=https://api.prod.example.com \
+REP_PUBLIC_FEATURE_FLAGS=dark-mode \
+REP_SENSITIVE_ANALYTICS_KEY=ak_live_prod_xyz \
+./rep-gateway --mode embedded --static-dir ./dist
+```
+
+No rebuild. No new container image. This is the core proposition.
+
+## Proxy mode
+
+If you already have nginx, Caddy, or another static file server, run the gateway in front of it instead:
+
+```bash
+REP_PUBLIC_API_URL=https://api.example.com \
+./rep-gateway --mode proxy --upstream localhost:80
+```
+
+The gateway intercepts `text/html` responses, injects the `<script>` tag, and passes everything else through unmodified.
+
+## What's next?
+
+- [Add a manifest file](/guides/manifest/) for startup validation and TypeScript type generation
+- [Framework-specific guides](/frameworks/react/) for React, Vue, and Svelte adapters
+- [Deploy with Docker](/deployment/docker-embedded/) for production containers
+- [Variable classification](/concepts/variable-classification/) to understand the three-tier security model

@@ -1,0 +1,100 @@
+---
+title: Todo App (React)
+description: Full worked example — React app with useRep, useRepSecure, hot reload, and Docker deployment.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A complete React todo app demonstrating all REP features. Source code at [`examples/todo-react/`](https://github.com/ruachtech/rep/tree/main/examples/todo-react).
+
+## Features demonstrated
+
+| Feature | Component/File | REP API |
+|---|---|---|
+| Public variable access | `App.tsx` | `useRep('APP_TITLE')` |
+| Enum validation | `Header.tsx` | `useRep('ENV_NAME')` |
+| URL variable | `TodoList.tsx` | `useRep('API_URL')` |
+| Number constraint | `TodoList.tsx` | `useRep('MAX_TODOS')` |
+| Sensitive variable | `Analytics.tsx` | `useRepSecure('ANALYTICS_KEY')` |
+| Payload metadata | `Footer.tsx` | `rep.meta()` |
+
+## Environment variables
+
+| Variable | Tier | Type | Default | Description |
+|---|---|---|---|---|
+| `APP_TITLE` | public | string | `"Todo App"` | Page title |
+| `ENV_NAME` | public | enum | — | `development`, `staging`, `production` |
+| `API_URL` | public | url | — | Backend API endpoint |
+| `MAX_TODOS` | public | number | `100` | Maximum todo items |
+| `ANALYTICS_KEY` | sensitive | string | — | Analytics tracking key |
+
+## Running locally
+
+### With the CLI
+
+```bash
+# From the repo root
+pnpm install
+
+# Validate the manifest
+cd examples/todo-react
+npx @rep-protocol/cli validate
+
+# Generate TypeScript types
+npx @rep-protocol/cli typegen
+
+# Start Vite dev server
+pnpm dev
+
+# In another terminal: start REP gateway proxy
+npx @rep-protocol/cli dev --proxy http://localhost:5173
+```
+
+Open `http://localhost:8080` to see the app with REP-injected variables.
+
+### With Docker
+
+```bash
+cd examples/todo-react
+docker build -t rep-todo .
+
+# Run with staging config
+docker run -p 8080:8080 \
+  -e REP_PUBLIC_APP_TITLE="Todo - Staging" \
+  -e REP_PUBLIC_ENV_NAME=staging \
+  -e REP_PUBLIC_API_URL=https://api.staging.example.com \
+  -e REP_PUBLIC_MAX_TODOS=50 \
+  -e REP_SENSITIVE_ANALYTICS_KEY=UA-XXXXX-staging \
+  rep-todo
+
+# Same image, production config
+docker run -p 8080:8080 \
+  -e REP_PUBLIC_APP_TITLE="Todo" \
+  -e REP_PUBLIC_ENV_NAME=production \
+  -e REP_PUBLIC_API_URL=https://api.example.com \
+  -e REP_SENSITIVE_ANALYTICS_KEY=UA-XXXXX-prod \
+  rep-todo
+```
+
+## Hot reload
+
+With the CLI dev server running, edit `.env.local` and send SIGHUP to the gateway:
+
+```bash
+# Edit .env.local, then:
+kill -HUP $(pidof rep-gateway)
+```
+
+Components using `useRep()` re-render automatically.
+
+## Dockerfile
+
+The example uses a 3-stage multi-stage build:
+
+1. **Download gateway:** Alpine + curl fetches the pre-built binary from GitHub Releases
+2. **Build app:** Node + pnpm builds SDK, React adapter, and the app in dependency order
+3. **Final image:** `FROM scratch` with just the gateway binary and static files
+
+<Aside type="tip">
+  The `FROM scratch` final image contains no OS, no shell, and no package manager. Total size is approximately 5MB (3MB gateway + 2MB static assets).
+</Aside>

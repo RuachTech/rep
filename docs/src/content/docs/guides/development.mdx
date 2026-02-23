@@ -1,0 +1,121 @@
+---
+title: Local Development
+description: Three approaches for developing with REP locally — defaults, mock payload, or the CLI dev server.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+During local development you typically don't have the REP gateway running. The SDK handles this gracefully — `rep.get()` returns `undefined` when no payload is present.
+
+## Option A: Default values (simplest)
+
+Use the second argument to `rep.get()`:
+
+```typescript
+const apiUrl = rep.get('API_URL', 'http://localhost:3000');
+// In dev: returns 'http://localhost:3000'
+// In prod: returns the injected value
+```
+
+This is the simplest approach and works with any framework. No extra configuration needed.
+
+## Option B: Mock payload in HTML
+
+Add a `<script id="__rep__">` tag to your `index.html`:
+
+```html
+<!-- Only in development — the gateway replaces this in production -->
+<script id="__rep__" type="application/json">
+{
+  "public": {
+    "API_URL": "http://localhost:3000",
+    "FEATURE_FLAGS": "dark-mode,debug"
+  },
+  "_meta": {
+    "version": "0.1.0",
+    "injected_at": "2026-01-01T00:00:00Z",
+    "integrity": "hmac-sha256:dev-mode-no-verification",
+    "ttl": 0
+  }
+}
+</script>
+```
+
+This gives you the full SDK experience (including `rep.verify()` and `rep.meta()`) without the gateway.
+
+<Aside type="caution">
+  Don't forget to remove this tag from your production HTML. In production, the gateway injects it automatically.
+</Aside>
+
+## Option C: CLI dev server (full fidelity)
+
+The `rep dev` command runs a local gateway that reads your `.env` file and proxies to your dev server:
+
+<Tabs>
+  <TabItem label="With Vite">
+  ```bash
+  # Terminal 1: Start Vite dev server
+  npm run dev
+  # → Vite running at http://localhost:5173
+
+  # Terminal 2: Start REP gateway proxy
+  rep dev --env .env.local --proxy http://localhost:5173
+  # → Gateway at http://localhost:8080 → proxies to Vite
+  ```
+
+  Open `http://localhost:8080` (the gateway port), not `:5173`. The gateway injects variables into Vite's HTML responses.
+  </TabItem>
+  <TabItem label="With static files">
+  ```bash
+  # Build first
+  npm run build
+
+  # Serve from dist/ with REP injection
+  rep dev --env .env.local --static ./dist
+  ```
+  </TabItem>
+</Tabs>
+
+### `.env.local` example
+
+```bash
+REP_PUBLIC_API_URL=http://localhost:3000
+REP_PUBLIC_FEATURE_FLAGS=dark-mode,debug
+REP_SENSITIVE_ANALYTICS_KEY=test-key-123
+```
+
+### CLI dev server options
+
+| Flag | Default | Description |
+|---|---|---|
+| `-e, --env <path>` | `.env.local` | Path to .env file |
+| `-p, --port <number>` | `8080` | Gateway port |
+| `--proxy <url>` | — | Upstream proxy URL |
+| `--static <path>` | — | Serve static files (embedded mode) |
+| `--hot-reload` | `false` | Enable hot reload |
+| `--gateway-bin <path>` | auto-detected | Path to gateway binary |
+
+<Aside>
+  When using proxy mode with Vite, access the site through the gateway port (8080), not Vite's port (5173). Vite's HMR WebSocket continues to work through the proxy for CSS and module updates.
+</Aside>
+
+## Using all CLI commands in development
+
+The CLI provides a complete development workflow:
+
+```bash
+# 1. Validate your manifest
+rep validate --manifest .rep.yaml
+# ✓ Manifest is valid — 6 variables, 4 settings
+
+# 2. Generate TypeScript types
+rep typegen --manifest .rep.yaml --output src/rep.d.ts
+# ✓ Generated types for 3 public + 2 sensitive variables
+
+# 3. Start the dev server
+rep dev --env .env.local --proxy http://localhost:5173
+
+# 4. Before deployment: scan bundles for leaked secrets
+rep lint --dir ./dist
+# ✓ No secrets detected in 12 files
+```

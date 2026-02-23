@@ -1,0 +1,61 @@
+---
+title: React Adapter API
+description: API reference for @rep-protocol/react hooks.
+---
+
+```bash
+npm install @rep-protocol/react @rep-protocol/sdk
+```
+
+## `useRep(key, defaultValue?)`
+
+```typescript
+function useRep(key: string): string | undefined;
+function useRep(key: string, defaultValue: string): string;
+```
+
+Reads a PUBLIC tier variable. Synchronous, hot-reload-aware.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `key` | `string` | Variable name (e.g., `'API_URL'`) |
+| `defaultValue` | `string` | Optional fallback value |
+
+**Returns:** `string | undefined` (or `string` if `defaultValue` provided).
+
+**Behavior:**
+- Reads from the injected payload immediately (no loading state)
+- Subscribes to hot reload in `useEffect`
+- Unsubscribes on unmount
+- Re-renders component when the variable changes
+
+## `useRepSecure(key)`
+
+```typescript
+function useRepSecure(key: string): {
+  value: string | null;
+  loading: boolean;
+  error: Error | null;
+};
+```
+
+Reads a SENSITIVE tier variable. Async — fetches a session key on first call.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `key` | `string` | Variable name (e.g., `'ANALYTICS_KEY'`) |
+
+**Returns:** `{ value, loading, error }` state object.
+
+**Behavior:**
+- Initial state: `{ value: null, loading: true, error: null }`
+- Success: `{ value: '...', loading: false, error: null }`
+- Failure: `{ value: null, loading: false, error: Error }`
+- Decrypted value is cached for the page lifetime
+- Re-fetches if `key` changes
+- Cleans up on unmount (cancelled flag prevents state update after unmount)
+
+## Requirements
+
+- React >= 16.8
+- `@rep-protocol/sdk` peer dependency

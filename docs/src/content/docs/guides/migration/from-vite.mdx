@@ -1,0 +1,79 @@
+---
+title: From Vite
+description: Migrate from Vite's import.meta.env to REP with the automated codemod.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Automated migration
+
+```bash
+npx @rep-protocol/codemod --framework vite src/
+```
+
+### What it transforms
+
+```typescript
+// Before
+const apiUrl = import.meta.env.VITE_API_URL;
+const flags = import.meta.env.VITE_FEATURE_FLAGS;
+
+// After
+import { rep } from '@rep-protocol/sdk';
+const apiUrl = rep.get('API_URL');
+const flags = rep.get('FEATURE_FLAGS');
+```
+
+### What it leaves alone
+
+Vite built-in variables are **not** transformed:
+
+- `import.meta.env.MODE`
+- `import.meta.env.DEV`
+- `import.meta.env.PROD`
+- `import.meta.env.SSR`
+- `import.meta.env.BASE_URL`
+
+### Preview first
+
+```bash
+npx @rep-protocol/codemod --framework vite --dry-run src/
+```
+
+## Manual migration
+
+If you prefer to migrate manually:
+
+1. **Rename environment variables:**
+   ```bash
+   VITE_API_URL        → REP_PUBLIC_API_URL
+   VITE_FEATURE_FLAGS  → REP_PUBLIC_FEATURE_FLAGS
+   VITE_ANALYTICS_KEY  → REP_SENSITIVE_ANALYTICS_KEY
+   ```
+
+2. **Update code:**
+   ```typescript
+   // Before
+   const apiUrl = import.meta.env.VITE_API_URL;
+
+   // After
+   import { rep } from '@rep-protocol/sdk';
+   const apiUrl = rep.get('API_URL', 'http://localhost:3000');
+   ```
+
+3. **Install the SDK:**
+   ```bash
+   npm install @rep-protocol/sdk
+   ```
+
+## Post-migration cleanup
+
+1. Remove `vite-env.d.ts` `ImportMeta` type augmentations (if you had custom ones)
+2. Remove `.env.production` and `.env.staging` files from the project
+3. Remove `envPrefix` configuration from `vite.config.ts` (if customized)
+4. Run `rep typegen --manifest .rep.yaml --output src/rep.d.ts` for typed access
+5. Update your Dockerfile to include the REP gateway
+
+<Aside type="tip">
+  The codemod is idempotent — running it twice produces the same result. It's safe to re-run after making manual changes.
+</Aside>

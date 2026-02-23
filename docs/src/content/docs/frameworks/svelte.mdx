@@ -1,0 +1,88 @@
+---
+title: Svelte
+description: Use REP with Svelte — repStore() and repSecureStore() as Svelte readable stores.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+## Installation
+
+```bash
+npm install @rep-protocol/svelte @rep-protocol/sdk
+```
+
+## Basic usage
+
+```svelte
+<script lang="ts">
+  import { repStore, repSecureStore } from '@rep-protocol/svelte';
+
+  // PUBLIC tier — synchronous, updates on hot reload
+  const apiUrl = repStore('API_URL', 'http://localhost:3000');
+  const flags = repStore('FEATURE_FLAGS', '');
+
+  // SENSITIVE tier — starts as null, resolves after decryption
+  const analyticsKey = repSecureStore('ANALYTICS_KEY');
+</script>
+
+<p>API: {$apiUrl}</p>
+<p>Analytics: {$analyticsKey ?? 'loading...'}</p>
+```
+
+## `repStore(key, defaultValue?)`
+
+Reads a **PUBLIC** tier variable as a Svelte `Readable<string | undefined>`.
+
+```typescript
+const value: Readable<string | undefined> = repStore('API_URL');
+const value: Readable<string | undefined> = repStore('API_URL', 'fallback');
+```
+
+- Synchronous initial value from the REP payload
+- Automatically updates when the variable changes via hot reload
+- **Lazy SSE:** the connection is established only when there is at least one subscriber, and closed when all subscribers unsubscribe
+
+## `repSecureStore(key)`
+
+Reads a **SENSITIVE** tier variable as a `Readable<string | null>`.
+
+```typescript
+const value: Readable<string | null> = repSecureStore('ANALYTICS_KEY');
+```
+
+- Starts as `null`
+- Resolves to the decrypted value once the session key fetch completes
+- Errors are swallowed (the SDK logs them); the store stays `null`
+
+<Aside type="caution">
+  `repSecureStore` does **not** support hot reload. Changes to sensitive variables require a page reload.
+</Aside>
+
+## Hot reload
+
+`repStore` subscribes to the SSE stream lazily — only when there's at least one subscriber. The store value updates automatically. When the last subscriber unsubscribes, the SSE connection is closed.
+
+## Development mode
+
+<Tabs>
+  <TabItem label="Default values">
+  ```typescript
+  const apiUrl = repStore('API_URL', 'http://localhost:3000');
+  ```
+  </TabItem>
+  <TabItem label="Mock payload">
+  Add to your `index.html`:
+  ```html
+  <script id="__rep__" type="application/json">
+  {"public":{"API_URL":"http://localhost:3000"},"_meta":{"version":"0.1.0","injected_at":"2026-01-01T00:00:00Z","integrity":"hmac-sha256:dev","ttl":0}}
+  </script>
+  ```
+  </TabItem>
+</Tabs>
+
+## Requirements
+
+- Svelte >= 4 or Svelte 5
+- `@rep-protocol/sdk` as a peer dependency
+
+For the full API reference, see [Svelte Adapter Reference](/reference/adapters/svelte/).

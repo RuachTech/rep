@@ -1,0 +1,145 @@
+---
+title: Hot Reload
+description: Live config updates via Server-Sent Events — no page reload, no redeployment.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Hot reload is an optional feature that pushes configuration changes to the browser via Server-Sent Events (SSE). When enabled, the gateway monitors for environment variable changes and broadcasts updates to connected clients.
+
+## Enabling hot reload
+
+```bash
+rep-gateway --hot-reload --mode embedded --static-dir ./dist
+```
+
+Or via environment variable:
+
+```bash
+REP_GATEWAY_HOT_RELOAD=true
+```
+
+## SSE event format
+
+The gateway exposes `GET /rep/changes` as an SSE endpoint:
+
+```
+event: rep:config:update
+data: {"key": "FEATURE_FLAGS", "tier": "public", "value": "dark-mode,ai-assist"}
+id: 1708267830000
+
+event: rep:config:delete
+data: {"key": "DEPRECATED_FLAG", "tier": "public"}
+id: 1708267831000
+```
+
+### Event types
+
+| Event | Description |
+|---|---|
+| `rep:config:update` | A variable's value changed or a new variable was added |
+| `rep:config:delete` | A variable was removed |
+
+## Change detection modes
+
+The gateway supports three modes for detecting environment variable changes:
+
+### File watch (recommended for Kubernetes)
+
+Watches a mounted ConfigMap or secrets volume for file changes:
+
+```bash
+rep-gateway --hot-reload --hot-reload-mode file_watch
+```
+
+Ideal for Kubernetes deployments where ConfigMaps are mounted as volumes. Changes are detected within seconds of a ConfigMap update.
+
+### Signal mode
+
+Re-reads the environment on receipt of `SIGHUP`:
+
+```bash
+# In another terminal or from a process manager:
+kill -HUP $(pidof rep-gateway)
+```
+
+Useful for traditional deployments where an orchestrator can signal the gateway.
+
+### Poll mode
+
+Periodically re-reads the config source:
+
+```bash
+rep-gateway --hot-reload --hot-reload-mode poll --hot-reload-poll-interval 30s
+```
+
+Simplest mode, but introduces a polling interval delay.
+
+## SDK integration
+
+### Lazy connection
+
+The SDK does **not** establish an SSE connection on import. It connects lazily when `onChange()` or `onAnyChange()` is first called:
+
+```typescript
+import { rep } from '@rep-protocol/sdk';
+
+// No SSE connection yet
+
+const unsub = rep.onChange('FEATURE_FLAGS', (newValue, oldValue) => {
+  console.log(`Flags changed: ${oldValue} → ${newValue}`);
+});
+// SSE connection established now
+
+unsub();
+// If no other listeners remain, SSE connection is closed
+```
+
+This is a deliberate design choice — applications that don't use hot reload pay zero network cost.
+
+### Framework adapters
+
+All framework adapters automatically subscribe to hot reload:
+
+- **React:** `useRep()` subscribes in `useEffect`, unsubscribes on unmount
+- **Vue:** `useRep()` subscribes in `setup()`, unsubscribes via `onUnmounted`
+- **Svelte:** `repStore()` subscribes when the store has subscribers, unsubscribes when the last subscriber leaves
+
+<Aside>
+  `useRepSecure()`, `useRepSecure()` (Vue), and `repSecureStore()` do **not** subscribe to hot reload. Sensitive variables require re-fetching a session key, which is too expensive for automatic updates.
+</Aside>
+
+### Handling reconnection
+
+SSE has built-in reconnection. If the connection drops, the browser automatically reconnects after a brief delay. The `id` field in SSE events allows the gateway to replay missed events.
+
+## Kubernetes hot reload
+
+In Kubernetes, combine ConfigMap volumes with file watch mode:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          image: myapp:latest
+          args:
+            - "--hot-reload"
+            - "--hot-reload-mode=file_watch"
+          volumeMounts:
+            - name: config
+              mountPath: /config
+      volumes:
+        - name: config
+          configMap:
+            name: app-config
+```
+
+When the ConfigMap is updated (`kubectl apply`), Kubernetes refreshes the mounted volume, the gateway detects the change, and connected browsers receive the update — all without a pod restart.
+
+<Aside type="caution">
+  Hot reload has an eventual consistency window. Between the config change and SSE delivery, clients see stale values. This window is typically sub-second for file watch mode but can be up to the poll interval for poll mode.
+</Aside>

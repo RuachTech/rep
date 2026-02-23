@@ -1,0 +1,54 @@
+---
+title: Svelte Adapter API
+description: API reference for @rep-protocol/svelte stores.
+---
+
+```bash
+npm install @rep-protocol/svelte @rep-protocol/sdk
+```
+
+## `repStore(key, defaultValue?)`
+
+```typescript
+function repStore(key: string, defaultValue?: string): Readable<string | undefined>;
+```
+
+Reads a PUBLIC tier variable as a Svelte `Readable` store.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `key` | `string` | Variable name |
+| `defaultValue` | `string` | Optional fallback value |
+
+**Returns:** `Readable<string | undefined>`
+
+**Behavior:**
+- Synchronous initial value from the payload
+- SSE subscription is **lazy** — established only when the store has subscribers
+- Updates automatically on config changes via hot reload
+- SSE connection closes when all subscribers unsubscribe
+
+## `repSecureStore(key)`
+
+```typescript
+function repSecureStore(key: string): Readable<string | null>;
+```
+
+Reads a SENSITIVE tier variable as a `Readable` store.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `key` | `string` | Variable name |
+
+**Returns:** `Readable<string | null>`
+
+**Behavior:**
+- Starts as `null`
+- Resolves after session key fetch and decryption
+- Errors are swallowed (SDK logs them); store stays `null`
+- Does **not** support hot reload
+
+## Requirements
+
+- Svelte >= 4 or Svelte 5
+- `@rep-protocol/sdk` peer dependency

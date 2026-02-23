@@ -10,12 +10,14 @@
     "url": "https://github.com/RuachTech/rep"
   },
   "scripts": {
-    "build": "pnpm -r --filter='!@rep-protocol/monorepo' run build",
-    "test": "pnpm -r --filter='!@rep-protocol/monorepo' run test",
-    "typecheck": "pnpm -r --filter='!@rep-protocol/monorepo' run typecheck",
+    "build": "pnpm -r --filter='!@rep-protocol/monorepo' --filter='!@rep-protocol/docs' run build",
+    "test": "pnpm -r --filter='!@rep-protocol/monorepo' --filter='!@rep-protocol/docs' run test",
+    "typecheck": "pnpm -r --filter='!@rep-protocol/monorepo' --filter='!@rep-protocol/docs' run typecheck",
     "clean": "pnpm -r exec rm -rf dist node_modules",
     "dev:sdk": "pnpm --filter @rep-protocol/sdk run dev",
-    "dev:cli": "pnpm --filter @rep-protocol/cli run dev"
+    "dev:cli": "pnpm --filter @rep-protocol/cli run dev",
+    "docs:dev": "pnpm --filter @rep-protocol/docs run dev",
+    "docs:build": "pnpm --filter @rep-protocol/docs run build"
   },
   "devDependencies": {
     "typescript": "^5.4.0"

@@ -1,0 +1,115 @@
+---
+title: Gateway Endpoints
+description: Reference for /rep/health, /rep/session-key, and /rep/changes endpoints.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## `GET /rep/health`
+
+Returns gateway health status including variable counts and guardrail status.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "version": "0.1.0",
+  "variables": {
+    "public": 3,
+    "sensitive": 1,
+    "server": 2
+  },
+  "guardrails": {
+    "warnings": 0,
+    "blocked": 0
+  },
+  "uptime_seconds": 3421
+}
+```
+
+**Use cases:**
+- Kubernetes liveness/readiness probes
+- Load balancer health checks
+- Monitoring dashboards
+
+**Kubernetes probe example:**
+```yaml
+livenessProbe:
+  httpGet:
+    path: /rep/health
+    port: 8080
+  initialDelaySeconds: 5
+readinessProbe:
+  httpGet:
+    path: /rep/health
+    port: 8080
+  initialDelaySeconds: 2
+```
+
+Use `--health-port` to serve the health endpoint on a separate port (e.g., `9090`) to keep it internal to the cluster.
+
+## `GET /rep/session-key`
+
+Issues a short-lived decryption key for SENSITIVE tier variables. Called by the SDK's `getSecure()` method.
+
+**Request requirements:**
+- Must include an `Origin` header matching configured allowed origins (if origins are configured)
+- If no allowed origins are configured, same-origin requests are permitted
+
+**Response:**
+```json
+{
+  "key": "{base64_encoded_derived_aes_key}",
+  "expires_at": "2026-02-18T14:30:30.000Z"
+}
+```
+
+| Field | Description |
+|---|---|
+| `key` | HKDF-derived AES-256 encryption key, base64-encoded |
+| `expires_at` | RFC 3339 timestamp — key expires 30 seconds after issuance |
+
+**Security constraints:**
+- Keys expire within 30 seconds
+- Rate-limited to 10 requests per minute per client IP
+- Not cacheable (`Cache-Control: no-store, no-cache, must-revalidate`)
+- CORS restricted to configured origins
+- All issuances are audit-logged (`rep.session_key.issued`)
+
+**Error responses:**
+- `429 Too Many Requests` — rate limit exceeded
+- `403 Forbidden` — origin not allowed
+- `404 Not Found` — no SENSITIVE variables configured
+
+<Aside type="caution">
+  The session key is the derived key, not the master key material. Even if intercepted, it cannot be used to derive the master key or generate new session keys.
+</Aside>
+
+## `GET /rep/changes`
+
+Server-Sent Events (SSE) stream that pushes configuration updates to connected clients. Only available when `--hot-reload` is enabled.
+
+**Event format:**
+
+```
+event: rep:config:update
+data: {"key": "FEATURE_FLAGS", "tier": "public", "value": "dark-mode,ai-assist"}
+id: 1708267830000
+
+event: rep:config:delete
+data: {"key": "DEPRECATED_FLAG", "tier": "public"}
+id: 1708267831000
+```
+
+**Event types:**
+
+| Event | Description |
+|---|---|
+| `rep:config:update` | A variable's value changed or a new variable was added |
+| `rep:config:delete` | A variable was removed |
+
+**Behavior:**
+- SSE has built-in reconnection — the browser automatically reconnects on disconnect
+- The `id` field allows replay of missed events
+- Returns `404 Not Found` if hot reload is not enabled
+- Only PUBLIC tier changes are broadcast (SENSITIVE changes require a page reload)

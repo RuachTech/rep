@@ -1,0 +1,106 @@
+---
+title: Vanilla JS
+description: Use REP without a framework — plain JavaScript, ESM import, no build tool required.
+---
+
+## Installation
+
+```bash
+npm install @rep-protocol/sdk
+```
+
+Or use directly from your bundled assets without npm.
+
+## Basic usage
+
+```html
+<script type="module">
+  import { rep } from '@rep-protocol/sdk';
+
+  // PUBLIC tier — synchronous
+  const apiUrl = rep.get('API_URL');
+  document.getElementById('api-url').textContent = apiUrl;
+
+  // SENSITIVE tier — async
+  const key = await rep.getSecure('ANALYTICS_KEY');
+  initAnalytics(key);
+</script>
+```
+
+## With hot reload
+
+```html
+<script type="module">
+  import { rep } from '@rep-protocol/sdk';
+
+  const el = document.getElementById('feature-flags');
+  el.textContent = rep.get('FEATURE_FLAGS');
+
+  // Update the DOM when config changes
+  rep.onChange('FEATURE_FLAGS', (newValue) => {
+    el.textContent = newValue;
+  });
+</script>
+```
+
+## Integrity verification
+
+```html
+<script type="module">
+  import { rep } from '@rep-protocol/sdk';
+
+  if (!rep.verify()) {
+    console.error('REP payload missing or tampered with');
+    // Handle gracefully — show fallback UI, disable sensitive features
+  }
+
+  const meta = rep.meta();
+  if (meta) {
+    console.log('REP version:', meta.version);
+    console.log('Injected at:', meta.injectedAt);
+    console.log('Integrity valid:', meta.integrityValid);
+  }
+</script>
+```
+
+## Development mode
+
+Without the gateway, `rep.get()` returns `undefined`. Two options:
+
+**Option A: Check and use fallbacks**
+
+```javascript
+const apiUrl = rep.get('API_URL') ?? 'http://localhost:3000';
+```
+
+**Option B: Mock payload in HTML**
+
+```html
+<script id="__rep__" type="application/json">
+{
+  "public": {
+    "API_URL": "http://localhost:3000",
+    "FEATURE_FLAGS": "dark-mode,debug"
+  },
+  "_meta": {
+    "version": "0.1.0",
+    "injected_at": "2026-01-01T00:00:00Z",
+    "integrity": "hmac-sha256:dev-mode-no-verification",
+    "ttl": 0
+  }
+}
+</script>
+```
+
+## No build tool required
+
+REP works without any build tool. If you have a static HTML site with inline `<script type="module">` tags, just import the SDK from a CDN or self-hosted path:
+
+```html
+<script type="module">
+  import { rep } from '/assets/rep-sdk.esm.js';
+  // Use rep.get(), rep.getSecure(), etc.
+</script>
+```
+
+The gateway injects the `<script id="__rep__">` payload into your HTML regardless of how your JavaScript is loaded.

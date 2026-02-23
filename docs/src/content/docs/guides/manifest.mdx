@@ -1,0 +1,157 @@
+---
+title: Manifest File
+description: Declare variables, types, and settings in .rep.yaml for validation and type generation.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The `.rep.yaml` manifest is optional but powerful. It enables:
+
+- **Startup validation** — fail fast if a required variable is missing
+- **Type constraints** — enforce `url`, `number`, `enum`, `csv` shapes
+- **TypeScript types** — `rep typegen` generates typed `get()` / `getSecure()` overloads
+- **Documentation** — a single source of truth for every variable the app uses
+
+## Example manifest
+
+```yaml
+version: "0.1.0"
+
+variables:
+  API_URL:
+    tier: public
+    type: url
+    required: true
+    description: "Base URL for the backend REST API"
+    example: "https://api.example.com"
+
+  FEATURE_FLAGS:
+    tier: public
+    type: csv
+    required: false
+    default: ""
+    description: "Comma-separated feature flags"
+    example: "dark-mode,new-checkout"
+
+  ENV_NAME:
+    tier: public
+    type: enum
+    required: true
+    values: ["development", "staging", "production"]
+    description: "Current deployment environment"
+
+  ANALYTICS_WRITE_KEY:
+    tier: sensitive
+    type: string
+    required: true
+    description: "Analytics service write key"
+
+  OAUTH_CLIENT_ID:
+    tier: sensitive
+    type: string
+    required: true
+    pattern: "^[a-zA-Z0-9]{20,}$"
+    description: "OAuth 2.0 client identifier"
+
+  UPSTREAM_AUTH_TOKEN:
+    tier: server
+    type: string
+    required: false
+    description: "Bearer token for upstream proxying"
+
+settings:
+  strict_guardrails: true
+  hot_reload: true
+  session_key_ttl: "30s"
+  session_key_max_rate: 10
+  allowed_origins:
+    - "https://app.example.com"
+```
+
+## Variable fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `tier` | `public` / `sensitive` / `server` | Yes | Security classification |
+| `type` | see below | Yes | Value type constraint |
+| `required` | boolean | No | Whether the variable must be present at startup |
+| `default` | string | No | Default value if not provided |
+| `description` | string | No | Human-readable description |
+| `example` | string | No | Example value |
+| `pattern` | string | No | Regex pattern the value must match |
+| `values` | string[] | No | Allowed values (for `enum` type) |
+| `deprecated` | boolean | No | Mark as deprecated |
+| `deprecated_message` | string | No | Migration guidance for deprecated vars |
+
+## Supported types
+
+| Type | Validation |
+|---|---|
+| `string` | Any string value |
+| `url` | Must be a valid URL |
+| `number` | Must parse as a number |
+| `boolean` | Must be `true`, `false`, `1`, or `0` |
+| `csv` | Comma-separated values |
+| `json` | Must be valid JSON |
+| `enum` | Must match one of the `values` array entries |
+
+## Settings
+
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `strict_guardrails` | boolean | `false` | Exit on guardrail warnings |
+| `hot_reload` | boolean | `false` | Enable hot reload SSE |
+| `hot_reload_mode` | string | `signal` | `file_watch`, `signal`, or `poll` |
+| `hot_reload_poll_interval` | string | `30s` | Poll interval (Go duration) |
+| `session_key_ttl` | string | `30s` | Session key expiry |
+| `session_key_max_rate` | number | `10` | Max session key requests per minute per IP |
+| `allowed_origins` | string[] | `[]` | CORS allowed origins for session key endpoint |
+
+## Validating
+
+```bash
+rep validate --manifest .rep.yaml
+```
+
+Output:
+```
+✓ Manifest is valid
+  Version: 0.1.0
+  Variables: 6 total
+    - PUBLIC: 3
+    - SENSITIVE: 2
+    - SERVER: 1
+  Settings configured: 4
+```
+
+Use in CI to catch configuration errors before deployment:
+
+```yaml
+- name: Validate REP manifest
+  run: npx @rep-protocol/cli validate --manifest .rep.yaml
+```
+
+## Type generation
+
+Generate TypeScript type definitions from your manifest:
+
+```bash
+rep typegen --manifest .rep.yaml --output src/rep.d.ts
+```
+
+This creates typed overloads for `get()` and `getSecure()`:
+
+```typescript
+declare module "@rep-protocol/sdk" {
+  export interface REP {
+    get(key: "API_URL" | "FEATURE_FLAGS" | "ENV_NAME"): string | undefined;
+    getSecure(key: "ANALYTICS_WRITE_KEY" | "OAUTH_CLIENT_ID"): Promise<string>;
+  }
+}
+```
+
+<Aside type="tip">
+  Run `rep typegen` as part of your build script or as a pre-commit hook to keep types in sync with the manifest.
+</Aside>
+
+For the full schema reference, see [Manifest Schema Reference](/reference/manifest-schema/).

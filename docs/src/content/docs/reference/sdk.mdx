@@ -1,0 +1,197 @@
+---
+title: SDK API
+description: Complete API reference for @rep-protocol/sdk.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+`@rep-protocol/sdk` — Zero-dependency, framework-agnostic TypeScript SDK for reading REP-injected environment variables.
+
+```bash
+npm install @rep-protocol/sdk
+```
+
+## `get(key)`
+
+Retrieve a PUBLIC tier variable. Synchronous — no network call, no promise.
+
+```typescript
+function get(key: string): string | undefined;
+function get(key: string, defaultValue: string): string;
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `key` | `string` | Variable name (after prefix stripping, e.g. `'API_URL'`) |
+| `defaultValue` | `string` | Optional fallback if the variable is not present |
+
+**Returns:** The variable value, `defaultValue`, or `undefined`.
+
+```typescript
+import { rep } from '@rep-protocol/sdk';
+
+const apiUrl = rep.get('API_URL');                    // string | undefined
+const apiUrl = rep.get('API_URL', 'http://localhost'); // string (never undefined)
+```
+
+## `getSecure(key)`
+
+Retrieve a SENSITIVE tier variable. Fetches a session key, decrypts the blob, and caches all sensitive values.
+
+```typescript
+function getSecure(key: string): Promise<string>;
+```
+
+| Parameter | Type | Description |
+|---|---|---|
+| `key` | `string` | Variable name (e.g. `'ANALYTICS_KEY'`) |
+
+**Returns:** `Promise<string>` — the decrypted value.
+
+**Throws:** `REPError` if the session key endpoint is unreachable, the key has expired, or decryption fails.
+
+```typescript
+const key = await rep.getSecure('ANALYTICS_KEY');
+```
+
+<Aside>
+  The first `getSecure()` call fetches a session key and decrypts **all** sensitive variables at once. Subsequent calls for different keys return from the in-memory cache without network requests.
+</Aside>
+
+## `getAll()`
+
+Retrieve all PUBLIC tier variables as a frozen object.
+
+```typescript
+function getAll(): Readonly<Record<string, string>>;
+```
+
+**Returns:** A frozen `Record<string, string>` of all public variables. Empty object if no payload is present.
+
+```typescript
+const allVars = rep.getAll();
+console.log(allVars.API_URL);
+```
+
+## `verify()`
+
+Check whether the REP payload is present and its integrity is valid.
+
+```typescript
+function verify(): boolean;
+```
+
+**Returns:** `true` if the payload is present, parseable, and the SRI hash matches. `false` if missing, malformed, or tampered.
+
+```typescript
+if (!rep.verify()) {
+  console.error('REP payload missing or tampered');
+}
+```
+
+## `meta()`
+
+Returns metadata about the current REP payload.
+
+```typescript
+function meta(): REPMeta | null;
+
+interface REPMeta {
+  version: string;
+  injectedAt: Date;
+  integrityValid: boolean;
+  publicCount: number;
+  sensitiveAvailable: boolean;
+  hotReloadAvailable: boolean;
+}
+```
+
+**Returns:** `REPMeta` object, or `null` if no payload is present.
+
+```typescript
+const m = rep.meta();
+if (m) {
+  console.log('REP version:', m.version);
+  console.log('Injected at:', m.injectedAt);
+  console.log('Public vars:', m.publicCount);
+}
+```
+
+## `onChange(key, callback)`
+
+Register a callback for when a specific variable changes via hot reload.
+
+```typescript
+function onChange(
+  key: string,
+  callback: (newValue: string, oldValue: string | undefined) => void
+): () => void;
+```
+
+**Returns:** An unsubscribe function. Call it to stop listening.
+
+The SSE connection is established lazily on the first `onChange()` or `onAnyChange()` call. It is closed when all listeners have been removed.
+
+```typescript
+const unsub = rep.onChange('FEATURE_FLAGS', (newValue, oldValue) => {
+  console.log(`Changed: ${oldValue} → ${newValue}`);
+});
+
+// Later:
+unsub();
+```
+
+## `onAnyChange(callback)`
+
+Register a callback for any variable change.
+
+```typescript
+function onAnyChange(
+  callback: (key: string, newValue: string, oldValue: string | undefined) => void
+): () => void;
+```
+
+**Returns:** An unsubscribe function.
+
+```typescript
+const unsub = rep.onAnyChange((key, newValue) => {
+  console.log(`${key} updated to ${newValue}`);
+});
+```
+
+## `REPError`
+
+Custom error class thrown by SDK operations.
+
+```typescript
+class REPError extends Error {
+  name: 'REPError';
+}
+```
+
+Thrown by `getSecure()` when the session key endpoint is unreachable, the key has expired, or decryption fails.
+
+## Import styles
+
+Both named exports and a namespace object are available:
+
+```typescript
+// Named imports
+import { get, getSecure, verify, onChange } from '@rep-protocol/sdk';
+
+// Namespace import (recommended)
+import { rep } from '@rep-protocol/sdk';
+rep.get('API_URL');
+```
+
+## Initialization behavior
+
+On import, the SDK synchronously:
+
+1. Locates `<script id="__rep__">` in the DOM
+2. Parses the JSON content
+3. Triggers async SRI verification (non-blocking)
+4. Freezes the `public` object
+5. Sets `_available` and `_tampered` internal flags
+
+No network calls are made during initialization.

@@ -1,0 +1,88 @@
+---
+title: Manifest Schema
+description: Complete reference for the .rep.yaml manifest file format.
+---
+
+The manifest schema is published as JSON Schema at [`/schema/rep-manifest.schema.json`](/schema/rep-manifest.schema.json).
+
+## Top-level fields
+
+```yaml
+version: "0.1.0"      # Required — protocol version
+variables: { ... }     # Required — variable declarations
+settings: { ... }      # Optional — gateway settings
+```
+
+## Variable declaration
+
+Each variable is declared under the `variables` map using its **stripped** name (e.g., `API_URL`, not `REP_PUBLIC_API_URL`):
+
+```yaml
+variables:
+  API_URL:
+    tier: public        # Required: public, sensitive, or server
+    type: url           # Required: string, url, number, boolean, csv, json, enum
+    required: true      # Optional (default: false)
+    default: ""         # Optional — default value if not provided
+    description: "..."  # Optional — human-readable description
+    example: "..."      # Optional — example value
+    pattern: "^..."     # Optional — regex pattern the value must match
+    values: [...]       # Optional — allowed values (enum type only)
+    deprecated: false   # Optional — mark as deprecated
+    deprecated_message: "Use NEW_VAR instead"  # Optional
+```
+
+### Field reference
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `tier` | `public` \| `sensitive` \| `server` | Yes | Security classification tier |
+| `type` | see types table | Yes | Value type constraint |
+| `required` | `boolean` | No | Must be present at startup (default: `false`) |
+| `default` | `string` | No | Default value when variable is absent |
+| `description` | `string` | No | Human-readable purpose |
+| `example` | `string` | No | Example value for documentation |
+| `pattern` | `string` | No | Regex the value must match |
+| `values` | `string[]` | No | Allowed values (for `enum` type) |
+| `deprecated` | `boolean` | No | Mark as deprecated |
+| `deprecated_message` | `string` | No | Migration guidance |
+
+### Supported types
+
+| Type | Validation | Example |
+|---|---|---|
+| `string` | Any string | `"hello"` |
+| `url` | Valid URL (RFC 3986) | `"https://api.example.com"` |
+| `number` | Parses as finite number | `"42"`, `"3.14"` |
+| `boolean` | `"true"`, `"false"`, `"1"`, `"0"` | `"true"` |
+| `csv` | Comma-separated string | `"a,b,c"` |
+| `json` | Valid JSON | `'{"key":"val"}'` |
+| `enum` | Matches `values` array | `"production"` |
+
+## Settings
+
+```yaml
+settings:
+  strict_guardrails: true
+  hot_reload: true
+  hot_reload_mode: "signal"
+  hot_reload_poll_interval: "30s"
+  session_key_ttl: "30s"
+  session_key_max_rate: 10
+  allowed_origins:
+    - "https://app.example.com"
+```
+
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `strict_guardrails` | `boolean` | `false` | Fail on guardrail warnings |
+| `hot_reload` | `boolean` | `false` | Enable hot reload SSE |
+| `hot_reload_mode` | `string` | `signal` | `file_watch`, `signal`, or `poll` |
+| `hot_reload_poll_interval` | `string` | `30s` | Poll interval (Go duration format) |
+| `session_key_ttl` | `string` | `30s` | Session key expiry duration |
+| `session_key_max_rate` | `integer` | `10` | Max session key requests/min/IP |
+| `allowed_origins` | `string[]` | `[]` | CORS origins for session key endpoint |
+
+## Full example
+
+See [`examples/.rep.yaml`](https://github.com/ruachtech/rep/blob/main/examples/.rep.yaml) for an annotated manifest with all tiers and types.

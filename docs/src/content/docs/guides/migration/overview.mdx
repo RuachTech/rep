@@ -1,0 +1,89 @@
+---
+title: Migration Overview
+description: A four-phase approach to migrating from build-time env vars to REP.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+REP is designed for incremental adoption. You don't need to migrate everything at once — you can start with a single variable and expand from there.
+
+## Migration phases
+
+<Steps>
+
+1. **Infrastructure**
+
+   Set up the gateway in your deployment pipeline:
+   - [ ] Download or build the gateway binary
+   - [ ] Add the gateway to your Dockerfile or Kubernetes deployment
+   - [ ] Configure `REP_GATEWAY_*` settings
+   - [ ] Verify with `curl /rep/health`
+
+2. **SDK adoption**
+
+   Replace env var reads in your application code:
+   - [ ] Install `@rep-protocol/sdk`
+   - [ ] Replace `import.meta.env.VITE_*` / `process.env.REACT_APP_*` with `rep.get()`
+   - [ ] Replace sensitive var reads with `await rep.getSecure()`
+   - [ ] Add default values for local development
+   - [ ] Run the codemod for automated migration (optional)
+
+3. **Build cleanup**
+
+   Remove build-time env var configuration:
+   - [ ] Remove `.env.production`, `.env.staging` etc. from the build
+   - [ ] Remove `--build-arg` flags from Docker builds
+   - [ ] Remove framework-specific env var type declarations
+   - [ ] Run `rep typegen` to generate SDK type declarations
+   - [ ] Update CI/CD to use environment-agnostic builds
+
+4. **Hardening**
+
+   Enable production security features:
+   - [ ] Create a `.rep.yaml` manifest with all variables declared
+   - [ ] Enable `--strict` mode for guardrail enforcement
+   - [ ] Configure `allowed_origins` for session key CORS
+   - [ ] Add `rep validate` to CI
+   - [ ] Add `rep lint` to CI to scan bundles for leaked secrets
+   - [ ] Review variable classification with the [decision tree](/concepts/variable-classification/)
+
+</Steps>
+
+## Using the codemod
+
+For automated migration, the codemod transforms env var access patterns:
+
+```bash
+# Vite projects
+npx @rep-protocol/codemod --framework vite src/
+
+# Create React App projects
+npx @rep-protocol/codemod --framework cra src/
+
+# Next.js projects
+npx @rep-protocol/codemod --framework next src/
+```
+
+Use `--dry-run` to preview changes before applying:
+
+```bash
+npx @rep-protocol/codemod --framework vite --dry-run src/
+```
+
+See framework-specific migration guides:
+- [From Vite](/guides/migration/from-vite/)
+- [From Create React App](/guides/migration/from-cra/)
+- [From Next.js](/guides/migration/from-next/)
+
+## After migration
+
+The codemod handles the code changes. You still need to:
+
+1. Remove framework-specific type augmentations (e.g., `vite-env.d.ts` `ImportMeta` overrides)
+2. Run `rep typegen` to generate typed SDK overloads
+3. Update container config to set `REP_PUBLIC_*` / `REP_SENSITIVE_*` environment variables
+4. Verify with a test deployment
+
+<Aside type="tip">
+  You can start without a manifest file. The gateway works with just naming conventions. Add `.rep.yaml` later when you want validation and type generation.
+</Aside>

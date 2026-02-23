@@ -1,0 +1,168 @@
+---
+title: Kubernetes
+description: Deploy REP with ConfigMaps, Secrets, sidecars, and hot reload in Kubernetes.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Embedded deployment
+
+The simplest Kubernetes deployment — gateway serves files directly:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: app
+          image: myapp:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: frontend-public-config
+            - secretRef:
+                name: frontend-sensitive-config
+          livenessProbe:
+            httpGet:
+              path: /rep/health
+              port: 8080
+            initialDelaySeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /rep/health
+              port: 8080
+            initialDelaySeconds: 2
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-public-config
+data:
+  REP_PUBLIC_API_URL: "https://api.example.com"
+  REP_PUBLIC_FEATURE_FLAGS: "dark-mode"
+  REP_PUBLIC_ENV_NAME: "production"
+  REP_GATEWAY_STRICT: "true"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: frontend-sensitive-config
+type: Opaque
+stringData:
+  REP_SENSITIVE_ANALYTICS_KEY: "UA-XXXXX-prod"
+  REP_SENSITIVE_SENTRY_DSN: "https://abc@sentry.io/123"
+```
+
+## Sidecar pattern (with nginx)
+
+When you want nginx serving files with the gateway as a sidecar:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  template:
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          volumeMounts:
+            - name: static-files
+              mountPath: /usr/share/nginx/html
+              readOnly: true
+          ports:
+            - containerPort: 80
+
+        - name: rep-gateway
+          image: ghcr.io/ruachtech/rep/gateway:latest
+          args:
+            - "--upstream=localhost:80"
+            - "--port=8080"
+            - "--strict"
+            - "--hot-reload"
+            - "--hot-reload-mode=file_watch"
+            - "--watch-path=/config"
+          envFrom:
+            - configMapRef:
+                name: frontend-public-config
+            - secretRef:
+                name: frontend-sensitive-config
+          volumeMounts:
+            - name: config-volume
+              mountPath: /config
+              readOnly: true
+          ports:
+            - containerPort: 8080
+          livenessProbe:
+            httpGet:
+              path: /rep/health
+              port: 8080
+
+      initContainers:
+        - name: copy-static
+          image: myapp:latest
+          command: ['cp', '-r', '/app/dist/.', '/static/']
+          volumeMounts:
+            - name: static-files
+              mountPath: /static
+
+      volumes:
+        - name: static-files
+          emptyDir: {}
+        - name: config-volume
+          configMap:
+            name: frontend-dynamic-config
+```
+
+## Hot reload with ConfigMaps
+
+Use file watch mode to detect ConfigMap changes without pod restarts:
+
+1. Mount the ConfigMap as a volume
+2. Enable `--hot-reload --hot-reload-mode=file_watch --watch-path=/config`
+3. Update the ConfigMap: `kubectl apply -f configmap.yaml`
+4. Kubernetes refreshes the mounted volume
+5. The gateway detects the change and broadcasts via SSE
+6. Connected browsers receive the update
+
+```bash
+# Update a config value
+kubectl patch configmap frontend-dynamic-config \
+  -p '{"data":{"REP_PUBLIC_FEATURE_FLAGS":"dark-mode,ai-assist"}}'
+```
+
+<Aside type="tip">
+  Use `--health-port 9090` to serve health checks on a separate port. This keeps the health endpoint accessible only within the cluster while the main port faces the load balancer.
+</Aside>
+
+## Service
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+spec:
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP
+```

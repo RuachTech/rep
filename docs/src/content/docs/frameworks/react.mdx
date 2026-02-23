@@ -1,0 +1,134 @@
+---
+title: React
+description: Use REP with React — useRep() and useRepSecure() hooks with automatic hot reload.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+## Installation
+
+```bash
+npm install @rep-protocol/react @rep-protocol/sdk
+```
+
+## Basic usage
+
+```tsx
+import { useRep, useRepSecure } from '@rep-protocol/react';
+
+function App() {
+  // PUBLIC tier — synchronous, no loading state
+  const apiUrl = useRep('API_URL', 'http://localhost:3000');
+  const flags = useRep('FEATURE_FLAGS', '').split(',');
+
+  // SENSITIVE tier — async, renders null until resolved
+  const { value: analyticsKey, loading, error } = useRepSecure('ANALYTICS_KEY');
+
+  if (loading) return <span>Loading...</span>;
+  if (error) return <span>Config error: {error.message}</span>;
+
+  return (
+    <div>
+      <p>API: {apiUrl}</p>
+      <p>Analytics: {analyticsKey}</p>
+    </div>
+  );
+}
+```
+
+## Migration from Vite / CRA
+
+**Before:**
+```typescript
+// src/config.ts
+export const API_URL = import.meta.env.VITE_API_URL;
+export const FEATURE_FLAGS = import.meta.env.VITE_FEATURE_FLAGS?.split(',') ?? [];
+```
+
+**After:**
+```typescript
+// src/config.ts
+import { rep } from '@rep-protocol/sdk';
+
+export const API_URL = rep.get('API_URL', 'http://localhost:3000');
+export const FEATURE_FLAGS = rep.get('FEATURE_FLAGS', '')?.split(',').filter(Boolean) ?? [];
+```
+
+Or use the codemod for automated migration:
+
+```bash
+npx @rep-protocol/codemod --framework vite src/
+```
+
+## `useRep(key, defaultValue?)`
+
+Reads a **PUBLIC** tier variable. Synchronous — no loading state, no Suspense.
+
+```tsx
+const value = useRep('API_URL');              // string | undefined
+const value = useRep('API_URL', 'fallback'); // string (never undefined)
+```
+
+- Returns the value from the injected payload immediately
+- Returns `defaultValue` (or `undefined`) if the variable is not present
+- Automatically re-renders when the variable changes via hot reload
+- Unsubscribes on unmount
+
+## `useRepSecure(key)`
+
+Reads a **SENSITIVE** tier variable. Async — fetches a session key on first call.
+
+```tsx
+const { value, loading, error } = useRepSecure('ANALYTICS_KEY');
+// value:   string | null  — null until resolved
+// loading: boolean        — true while fetching
+// error:   Error | null   — set if fetch or decryption fails
+```
+
+- Starts with `{ value: null, loading: true, error: null }`
+- The decrypted value is cached by the SDK for the page lifetime
+- Re-fetches if the `key` prop changes
+
+## Hot reload
+
+Both hooks subscribe to the gateway's SSE stream when `--hot-reload` is enabled. Components re-render automatically when config changes. If hot reload is not available, hooks still work — they just won't update after initial render.
+
+<Aside>
+  `useRepSecure` subscribes to hot reload for re-rendering, but sensitive variable decryption requires a new session key — which means a full component remount for updated sensitive values.
+</Aside>
+
+## Development mode
+
+Without the gateway running, `useRep()` returns `undefined`. Two approaches:
+
+<Tabs>
+  <TabItem label="Default values">
+  ```tsx
+  const apiUrl = useRep('API_URL', 'http://localhost:3000');
+  ```
+  </TabItem>
+  <TabItem label="Mock payload">
+  Add to your `index.html` during development:
+  ```html
+  <script id="__rep__" type="application/json">
+  {"public":{"API_URL":"http://localhost:3000","FEATURE_FLAGS":"dark-mode"},"_meta":{"version":"0.1.0","injected_at":"2026-01-01T00:00:00Z","integrity":"hmac-sha256:dev","ttl":0}}
+  </script>
+  ```
+  </TabItem>
+  <TabItem label="CLI dev server">
+  ```bash
+  # Terminal 1: Vite dev server
+  npm run dev
+
+  # Terminal 2: REP gateway proxy
+  npx @rep-protocol/cli dev --proxy http://localhost:5173
+  ```
+  </TabItem>
+</Tabs>
+
+## Requirements
+
+- React >= 16.8 (hooks support)
+- `@rep-protocol/sdk` as a peer dependency
+
+For the full API reference, see [React Adapter Reference](/reference/adapters/react/).

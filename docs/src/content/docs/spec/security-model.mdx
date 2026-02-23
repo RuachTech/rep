@@ -1,0 +1,33 @@
+---
+title: Security Model Specification
+description: Formal threat model and security analysis for the Runtime Environment Protocol.
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+```
+Document:  REP Security Model
+Version:   0.1.0
+Status:    Active
+Authors:   Olamide Adebayo (Ruach Tech)
+License:   CC BY 4.0
+```
+
+<Aside>
+  For a practical guide to REP's security properties, see [Security Model (Concepts)](/concepts/security-model/). This page is the formal specification document.
+</Aside>
+
+<LinkCard title="Security Model (Concepts)" href="/concepts/security-model/" description="Practical guide — threat analysis, hardening, monitoring recommendations" />
+
+The concepts page contains the full content of this specification, reformatted for easier navigation. It covers:
+
+- Fundamental axiom and trust boundaries
+- All 7 threat analyses (T1-T7) with severity, mitigations, and residual risk
+- Variable classification decision tree with common misclassifications
+- Production hardening recommendations (gateway config, FROM scratch Dockerfile, CSP headers)
+- Monitoring and alerting setup
+- Known limitations
+
+---
+
+The full source document is at [`spec/SECURITY-MODEL.md`](https://github.com/ruachtech/rep/blob/main/spec/SECURITY-MODEL.md).

@@ -1,0 +1,122 @@
+---
+title: CLI Commands
+description: Complete reference for the @rep-protocol/cli tool — validate, typegen, lint, dev.
+---
+
+```bash
+npm install -g @rep-protocol/cli
+# or
+npx @rep-protocol/cli [command]
+```
+
+## `rep validate`
+
+Validate a `.rep.yaml` manifest against the JSON schema.
+
+```bash
+rep validate [--manifest <path>]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-m, --manifest <path>` | `.rep.yaml` | Path to manifest file |
+
+**Example:**
+```bash
+$ rep validate --manifest .rep.yaml
+✓ Manifest is valid
+  Version: 0.1.0
+  Variables: 11 total
+    - PUBLIC: 6
+    - SENSITIVE: 3
+    - SERVER: 2
+  Settings configured: 6
+```
+
+## `rep typegen`
+
+Generate TypeScript type definitions from a manifest. Creates strongly-typed overloads for `rep.get()` and `rep.getSecure()`.
+
+```bash
+rep typegen [--manifest <path>] [--output <path>]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-m, --manifest <path>` | `.rep.yaml` | Path to manifest file |
+| `-o, --output <path>` | `src/rep.d.ts` | Output path for generated types |
+
+**Generated output:**
+```typescript
+declare module "@rep-protocol/sdk" {
+  export interface REP {
+    get(key: "API_URL" | "FEATURE_FLAGS"): string | undefined;
+    getSecure(key: "ANALYTICS_KEY"): Promise<string>;
+    // ... other methods
+  }
+}
+```
+
+## `rep lint`
+
+Scan built JavaScript bundles for accidentally leaked secrets. Uses the same guardrail detection as the gateway (Shannon entropy, known secret formats).
+
+```bash
+rep lint [--dir <path>] [--pattern <glob>] [--strict]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-d, --dir <path>` | `./dist` | Directory to scan |
+| `--pattern <glob>` | `**/*.{js,mjs,cjs}` | File pattern to scan |
+| `--strict` | `false` | Exit with error code if warnings found |
+
+**Example:**
+```bash
+$ rep lint --dir ./dist
+⚠ dist/main.js
+  high_entropy:42: value has high entropy (5.23 bits/char) — may be a secret
+    const key = "sk_live_abc123..."
+
+⚠ Found 1 potential secret(s) in 1 file(s)
+```
+
+**Use cases:**
+- CI/CD pipeline step before deployment
+- Pre-commit hook
+- Regular audits of production bundles
+
+## `rep dev`
+
+Run a local development server with the REP gateway. Loads env vars from a file and starts the gateway.
+
+```bash
+rep dev [options]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `-e, --env <path>` | `.env.local` | Path to .env file |
+| `-p, --port <number>` | `8080` | Gateway port |
+| `--proxy <url>` | — | Upstream proxy URL (e.g., `http://localhost:5173`) |
+| `--static <path>` | — | Serve static files (embedded mode) |
+| `--hot-reload` | `false` | Enable hot reload |
+| `--gateway-bin <path>` | auto | Path to gateway binary |
+
+**Example workflows:**
+
+```bash
+# Proxy mode with Vite
+rep dev --env .env.local --proxy http://localhost:5173
+
+# Embedded mode with static files
+rep dev --env .env.local --static ./dist --port 8080
+```
+
+## Binary resolution
+
+The CLI looks for the gateway binary in this order:
+
+1. Bundled binary (downloaded during `npm install`)
+2. Custom path via `--gateway-bin`
+3. `rep-gateway` in system `PATH`

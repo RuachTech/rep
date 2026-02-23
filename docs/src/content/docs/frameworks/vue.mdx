@@ -1,0 +1,94 @@
+---
+title: Vue
+description: Use REP with Vue 3 — useRep() and useRepSecure() composables with reactive refs.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+## Installation
+
+```bash
+npm install @rep-protocol/vue @rep-protocol/sdk
+```
+
+## Basic usage
+
+```vue
+<script setup lang="ts">
+import { useRep, useRepSecure } from '@rep-protocol/vue';
+
+// PUBLIC tier — synchronous, reactive Ref
+const apiUrl = useRep('API_URL', 'http://localhost:3000');
+const flags = useRep('FEATURE_FLAGS', '');
+
+// SENSITIVE tier — async, resolves after session key fetch
+const analyticsKey = useRepSecure('ANALYTICS_KEY');
+</script>
+
+<template>
+  <div>
+    <p>API: {{ apiUrl }}</p>
+    <p>Analytics: {{ analyticsKey ?? 'loading...' }}</p>
+  </div>
+</template>
+```
+
+## `useRep(key, defaultValue?)`
+
+Reads a **PUBLIC** tier variable as a reactive `Ref`.
+
+```typescript
+const value: Ref<string | undefined> = useRep('API_URL');
+const value: Ref<string | undefined> = useRep('API_URL', 'fallback');
+```
+
+- Returns a `Ref` set immediately from the injected payload
+- Automatically updates when the variable changes via hot reload
+- Unsubscribes via `onUnmounted` — must be called inside `setup()`
+
+## `useRepSecure(key)`
+
+Reads a **SENSITIVE** tier variable as a reactive `Ref`.
+
+```typescript
+const analyticsKey: Ref<string | null> = useRepSecure('ANALYTICS_KEY');
+```
+
+- Starts as `null`
+- Resolves once the session key fetch and decryption complete
+- Errors are swallowed (the SDK logs them); the ref stays `null`
+- The decrypted value is cached for the page lifetime
+
+<Aside type="caution">
+  `useRepSecure` does **not** subscribe to hot reload. Sensitive variable changes require a page reload to obtain a new session key.
+</Aside>
+
+## Hot reload
+
+`useRep` subscribes to the SSE stream on mount and updates the ref automatically. The subscription is cleaned up when the component unmounts.
+
+## Development mode
+
+<Tabs>
+  <TabItem label="Default values">
+  ```typescript
+  const apiUrl = useRep('API_URL', 'http://localhost:3000');
+  ```
+  </TabItem>
+  <TabItem label="Mock payload">
+  Add to your `index.html`:
+  ```html
+  <script id="__rep__" type="application/json">
+  {"public":{"API_URL":"http://localhost:3000"},"_meta":{"version":"0.1.0","injected_at":"2026-01-01T00:00:00Z","integrity":"hmac-sha256:dev","ttl":0}}
+  </script>
+  ```
+  </TabItem>
+</Tabs>
+
+## Requirements
+
+- Vue >= 3.0
+- `@rep-protocol/sdk` as a peer dependency
+- Composables must be called from `setup()` for proper `onUnmounted` cleanup
+
+For the full API reference, see [Vue Adapter Reference](/reference/adapters/vue/).

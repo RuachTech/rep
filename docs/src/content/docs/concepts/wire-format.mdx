@@ -1,0 +1,124 @@
+---
+title: Wire Format
+description: Payload JSON structure, encrypted blob format, and integrity verification.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Payload structure
+
+The gateway injects a `<script>` tag into HTML responses containing the REP payload as JSON:
+
+```html
+<script id="__rep__" type="application/json"
+        data-rep-version="0.1.0"
+        data-rep-integrity="sha256-{base64_hash}">
+{
+  "public": { ... },
+  "sensitive": "...",
+  "_meta": { ... }
+}
+</script>
+```
+
+### Fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `public` | `object` | Yes | Key-value map of PUBLIC tier variables (strings only) |
+| `sensitive` | `string` | No | Base64-encoded AES-256-GCM encrypted blob |
+| `_meta` | `object` | Yes | Payload metadata |
+
+### `_meta` fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `version` | `string` | Yes | Protocol version (semver) |
+| `injected_at` | `string` | Yes | RFC 3339 timestamp of injection |
+| `integrity` | `string` | Yes | `hmac-sha256:{base64_signature}` |
+| `key_endpoint` | `string` | No | Path to session key endpoint (`/rep/session-key`) |
+| `hot_reload` | `string` | No | Path to SSE endpoint (`/rep/changes`) |
+| `ttl` | `integer` | No | Cache TTL in seconds (0 = no cache) |
+
+### SRI attribute
+
+The `data-rep-integrity` attribute contains a SHA-256 hash of the raw JSON content:
+
+```
+data-rep-integrity="sha256-{base64_of_sha256_digest}"
+```
+
+The SDK verifies this using the Web Crypto API, comparing the hash against the actual `textContent` of the `<script>` element (byte-for-byte matching the gateway's computation).
+
+## Encrypted blob format
+
+When SENSITIVE variables are present, they are encrypted into a single binary blob:
+
+```
+[12 bytes nonce][ciphertext][16 bytes GCM auth tag]
+```
+
+| Segment | Size | Description |
+|---|---|---|
+| Nonce | 12 bytes | Random IV for AES-256-GCM |
+| Ciphertext | Variable | Encrypted JSON of all sensitive key-value pairs |
+| Auth tag | 16 bytes | GCM authentication tag |
+
+The entire blob is base64-encoded in the `sensitive` field.
+
+### Key derivation (HKDF-SHA256)
+
+The encryption key is derived from an ephemeral master key using HKDF (RFC 5869):
+
+1. Gateway generates a 32-byte random master key at startup
+2. Extract: `PRK = HMAC-SHA256(salt="rep-v1", IKM=master_key)`
+3. Expand: `derived_key = HKDF-Expand(PRK, info="rep-session-key", L=32)`
+4. The derived key (not the master key) is issued via `/rep/session-key`
+5. Both master and derived keys exist only in memory — never stored to disk
+
+### Decryption (client-side)
+
+The SDK decrypts sensitive variables in `getSecure()`:
+
+1. Fetch the session key from `/rep/session-key`
+2. Base64-decode the session key
+3. Base64-decode the `sensitive` blob
+4. Extract: first 12 bytes = nonce, last 16 bytes = auth tag, middle = ciphertext
+5. Decrypt with AES-256-GCM using `_meta.integrity` as Additional Authenticated Data (AAD)
+6. Parse the resulting JSON to get all sensitive key-value pairs
+7. Cache all decrypted values in memory for the page lifetime
+
+<Aside type="tip">
+  All sensitive variables are decrypted together on the first `getSecure()` call. Subsequent calls for different keys return from the in-memory cache without additional network requests.
+</Aside>
+
+## Integrity verification
+
+### HMAC-SHA256
+
+The integrity token is computed over a canonicalized representation of the payload:
+
+1. Construct a JSON object with sorted keys, no whitespace
+2. Include both `public` and `sensitive` fields
+3. Compute: `HMAC-SHA256(secret, canonical_json)`
+4. Encode as: `hmac-sha256:{base64_signature}`
+
+The HMAC secret exists only in the gateway's memory and is never transmitted. The SDK cannot verify the HMAC — this is by design. The HMAC enables server-side verification by other infrastructure components.
+
+### SRI verification (client-side)
+
+The SDK verifies payload integrity using the `data-rep-integrity` attribute:
+
+1. Read the raw `textContent` of the `<script>` element
+2. Compute SHA-256 using the Web Crypto API
+3. Compare with the `data-rep-integrity` attribute value
+4. Set `_tampered` flag if mismatch
+
+This detects modifications to the payload content after injection (e.g., by a browser extension or CDN).
+
+## JSON schemas
+
+The payload and manifest schemas are available as JSON Schema (Draft 2020-12):
+
+- [Payload schema](/schema/rep-payload.schema.json)
+- [Manifest schema](/schema/rep-manifest.schema.json)

@@ -1,0 +1,57 @@
+---
+title: From Create React App
+description: Migrate from CRA's process.env.REACT_APP_* to REP.
+---
+
+## Automated migration
+
+```bash
+npx @rep-protocol/codemod --framework cra src/
+```
+
+### What it transforms
+
+```typescript
+// Before
+const apiUrl = process.env.REACT_APP_API_URL;
+const flags = process.env.REACT_APP_FEATURE_FLAGS;
+
+// After
+import { rep } from '@rep-protocol/sdk';
+const apiUrl = rep.get('API_URL');
+const flags = rep.get('FEATURE_FLAGS');
+```
+
+Only `REACT_APP_*` prefixed variables are transformed. Other `process.env.*` access is left unchanged.
+
+### Preview first
+
+```bash
+npx @rep-protocol/codemod --framework cra --dry-run src/
+```
+
+## Manual migration
+
+1. **Rename environment variables:**
+   ```bash
+   REACT_APP_API_URL        → REP_PUBLIC_API_URL
+   REACT_APP_ANALYTICS_KEY  → REP_SENSITIVE_ANALYTICS_KEY
+   ```
+
+2. **Update code:**
+   ```typescript
+   import { rep } from '@rep-protocol/sdk';
+   const apiUrl = rep.get('API_URL', 'http://localhost:3000');
+   ```
+
+3. **Install the SDK:**
+   ```bash
+   npm install @rep-protocol/sdk
+   ```
+
+## Post-migration cleanup
+
+1. Remove `react-app-env.d.ts` (CRA's auto-generated type declarations)
+2. Remove `.env.production` and `.env.staging` files
+3. Run `rep typegen` for typed access
+4. Update your Dockerfile to include the REP gateway

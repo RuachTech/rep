@@ -1,0 +1,98 @@
+---
+title: Zero-Config Quick Start
+description: Use REP with just naming conventions — no manifest, no CLI, no configuration file.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The `.rep.yaml` manifest is entirely optional. The gateway works with nothing but environment variables — the naming convention **is** the configuration.
+
+## How it works
+
+| Env var prefix | Tier | In the browser |
+|---|---|---|
+| `REP_PUBLIC_*` | PUBLIC | Plaintext in `<script id="__rep__">`. Read with `rep.get()`. |
+| `REP_SENSITIVE_*` | SENSITIVE | AES-256-GCM encrypted. Decrypt with `await rep.getSecure()`. |
+| `REP_SERVER_*` | SERVER | Never leaves the gateway process. |
+| `REP_GATEWAY_*` | Config | Gateway settings. Not injected into the app. |
+
+That's the entire protocol.
+
+## Step 1 — Rename your env vars
+
+```bash
+# Before (Vite)            → After (REP)
+VITE_API_URL               → REP_PUBLIC_API_URL
+VITE_FEATURE_FLAGS         → REP_PUBLIC_FEATURE_FLAGS
+
+# Before (CRA)             → After (REP)
+REACT_APP_API_URL          → REP_PUBLIC_API_URL
+
+# Should be encrypted
+REACT_APP_ANALYTICS_KEY    → REP_SENSITIVE_ANALYTICS_KEY
+
+# Should never reach the browser
+DB_PASSWORD                → REP_SERVER_DB_PASSWORD
+```
+
+## Step 2 — Install the SDK and update reads
+
+```bash
+npm install @rep-protocol/sdk
+```
+
+```typescript
+import { rep } from '@rep-protocol/sdk';
+
+// Was: import.meta.env.VITE_API_URL
+const apiUrl = rep.get('API_URL');
+
+// With a default for local development
+const apiUrl = rep.get('API_URL', 'http://localhost:3001');
+
+// Sensitive — encrypted, decrypted on demand
+const key = await rep.getSecure('ANALYTICS_KEY');
+```
+
+## Step 3 — Build your app (nothing changes)
+
+```bash
+npm run build
+```
+
+The output is now environment-agnostic.
+
+## Step 4 — Run the gateway
+
+```bash
+REP_PUBLIC_API_URL=https://api.example.com \
+REP_PUBLIC_FEATURE_FLAGS=dark-mode,new-checkout \
+REP_SENSITIVE_ANALYTICS_KEY=ak_live_abc123 \
+./rep-gateway --mode embedded --static-dir ./dist
+```
+
+Open `http://localhost:8080` — done.
+
+## Changing config without rebuilding
+
+```bash
+# Stop. Change values. Restart.
+REP_PUBLIC_API_URL=https://api.prod.example.com \
+REP_PUBLIC_FEATURE_FLAGS=dark-mode \
+./rep-gateway --mode embedded --static-dir ./dist
+```
+
+Same `dist/` folder. Different runtime config.
+
+## When to add a manifest
+
+The manifest is additive. Add it when you need:
+
+- **Startup validation** — fail fast if a required variable is missing
+- **Type constraints** — enforce `url`, `number`, `enum` shapes
+- **TypeScript types** — `rep typegen` generates typed overloads
+- **Documentation** — single source of truth for all variables
+
+<Aside type="tip">
+  Start without a manifest. Add one later when you want validation and type generation. See the [Manifest guide](/guides/manifest/).
+</Aside>

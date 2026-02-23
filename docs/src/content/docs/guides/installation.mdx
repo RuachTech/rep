@@ -1,0 +1,112 @@
+---
+title: Installation
+description: Install the REP SDK, CLI, and gateway binary.
+---
+
+import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+## SDK
+
+The SDK is the only package required for your application code. Zero runtime dependencies, ~1.5KB gzipped.
+
+```bash
+npm install @rep-protocol/sdk
+```
+
+## Framework adapters (optional)
+
+If you're using React, Vue, or Svelte, install the corresponding adapter for hot-reload-aware hooks and stores:
+
+<Tabs>
+  <TabItem label="React">
+  ```bash
+  npm install @rep-protocol/react @rep-protocol/sdk
+  ```
+  </TabItem>
+  <TabItem label="Vue">
+  ```bash
+  npm install @rep-protocol/vue @rep-protocol/sdk
+  ```
+  </TabItem>
+  <TabItem label="Svelte">
+  ```bash
+  npm install @rep-protocol/svelte @rep-protocol/sdk
+  ```
+  </TabItem>
+</Tabs>
+
+## CLI
+
+The CLI provides `rep validate`, `rep typegen`, `rep lint`, and `rep dev` commands. It automatically downloads the correct gateway binary for your platform during installation.
+
+```bash
+npm install -g @rep-protocol/cli
+```
+
+Or use without installing:
+
+```bash
+npx @rep-protocol/cli validate
+npx @rep-protocol/cli dev --proxy http://localhost:5173
+```
+
+## Gateway binary
+
+The gateway is a standalone Go binary (~3MB). There are several ways to get it:
+
+### Via the CLI (recommended)
+
+The `@rep-protocol/cli` package downloads the gateway binary automatically during `npm install`.
+
+### Docker image
+
+```bash
+docker pull ghcr.io/ruachtech/rep/gateway:latest
+```
+
+Or use in a multi-stage build:
+
+```dockerfile
+COPY --from=ghcr.io/ruachtech/rep/gateway:latest /usr/local/bin/rep-gateway /usr/local/bin/rep-gateway
+```
+
+### Direct download
+
+Download from [GitHub Releases](https://github.com/ruachtech/rep/releases) for your platform:
+
+```bash
+# Linux amd64
+curl -fsSL https://github.com/RuachTech/rep/releases/download/gateway/v0.1.2/rep-gateway_0.1.2_linux_amd64.tar.gz | tar -xz
+mv rep-gateway /usr/local/bin/
+
+# macOS arm64
+curl -fsSL https://github.com/RuachTech/rep/releases/download/gateway/v0.1.2/rep-gateway_0.1.2_darwin_arm64.tar.gz | tar -xz
+mv rep-gateway /usr/local/bin/
+```
+
+### Build from source
+
+Requires Go >= 1.24.5:
+
+```bash
+cd gateway
+make build
+# Binary at gateway/bin/rep-gateway
+```
+
+## Development prerequisites
+
+For contributing to REP itself:
+
+| Tool | Version | Purpose |
+|---|---|---|
+| Node.js | >= 20.0.0 | TypeScript packages |
+| pnpm | >= 9.0.0 | Workspace management |
+| Go | >= 1.24.5 | Gateway development |
+
+```bash
+git clone https://github.com/ruachtech/rep.git
+cd rep
+pnpm install
+pnpm run build
+```

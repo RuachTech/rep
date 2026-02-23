@@ -1,0 +1,124 @@
+---
+title: Contributing
+description: How to contribute to the Runtime Environment Protocol project.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Getting started
+
+### Prerequisites
+
+- **Node.js** >= 20.0.0
+- **pnpm** >= 9.0.0 — `npm install -g pnpm`
+- **Go** >= 1.24.5 (for gateway development only)
+
+### Setup
+
+```bash
+git clone https://github.com/ruachtech/rep.git
+cd rep
+pnpm install
+pnpm run build
+pnpm run test
+```
+
+For gateway:
+```bash
+cd gateway
+go test -race ./...
+```
+
+## Project structure
+
+```
+rep/
+├── spec/           # Protocol specification documents
+├── schema/         # JSON schemas for payload and manifest
+├── gateway/        # Go reference implementation (stdlib only)
+├── sdk/            # @rep-protocol/sdk (zero runtime deps)
+├── cli/            # @rep-protocol/cli
+├── adapters/       # React, Vue, Svelte adapters
+├── codemod/        # Migration tool
+├── docs/           # This documentation site (Astro/Starlight)
+└── examples/       # Example applications
+```
+
+## Commit conventions
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/). Every commit to `main` must follow this format:
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+```
+
+### Types
+
+| Type | Effect | Example |
+|---|---|---|
+| `fix` | Patch release | `fix(sdk): handle missing meta field` |
+| `feat` | Minor release | `feat(gateway): add poll mode for hot reload` |
+| `feat!` | Major release | `feat!(sdk)!: rename getSecure to decrypt` |
+| `docs` | No release | `docs(spec): clarify SRI verification` |
+| `chore` | No release | `chore: update dev dependencies` |
+| `refactor` | No release | `refactor(gateway): extract inject middleware` |
+| `test` | No release | `test(sdk): add hot reload tests` |
+| `perf` | No release | `perf(gateway): reduce allocation in inject` |
+
+### Scopes
+
+`sdk`, `gateway`, `cli`, `react`, `vue`, `svelte`, `codemod`, `spec`, `docs`
+
+## Code style
+
+### Go (Gateway)
+
+- **Standard library only.** No third-party dependencies.
+- Structured logging via `log/slog`
+- Error wrapping: `fmt.Errorf("context: %w", err)`
+- No `init()` functions
+- Tests use stdlib only (`testing`, `net/http/httptest`)
+- Use `t.Setenv()` for env var tests (never `os.Setenv` directly)
+- Run with `-race` flag
+
+### TypeScript (SDK, CLI, Adapters)
+
+- Zero runtime dependencies for the SDK
+- Vitest + jsdom for testing
+- `vi.resetModules()` before each SDK test (because `_init()` runs on module load)
+- DOM cleanup in `beforeEach`
+
+## Testing
+
+```bash
+# All TypeScript packages
+pnpm run test
+
+# Gateway (from gateway/)
+go test -race ./...
+
+# Specific package
+pnpm --filter @rep-protocol/sdk run test
+```
+
+## Release process
+
+Releases are automated via [release-please](https://github.com/googleapis/release-please):
+
+1. Push conventional commits to `main`
+2. Release-please creates/updates a Release PR with version bumps and changelogs
+3. Merging the Release PR triggers npm publishing for all packages
+4. The gateway is versioned independently via `gateway/VERSION` and released through GoReleaser
+
+<Aside type="caution">
+  Do not manually bump versions in `package.json` or create release tags. The automation handles this.
+</Aside>
+
+## PR guidelines
+
+- Branch from `main`
+- Keep PRs focused on a single change
+- Include tests for new functionality
+- Use squash-merge with a conventional commit message

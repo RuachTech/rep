@@ -4,3 +4,4 @@ packages:
   - 'adapters/*'
   - 'codemod'
   - 'examples/*'
+  - 'docs'

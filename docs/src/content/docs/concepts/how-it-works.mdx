@@ -1,0 +1,126 @@
+---
+title: How REP Works
+description: Architecture overview — gateway modes, startup sequence, and HTML injection.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Architecture
+
+REP introduces a lightweight gateway process between the browser and your static file server. The gateway reads `REP_*` environment variables at startup, classifies them, and injects a `<script>` tag into every HTML response.
+
+```
+Container boot:
+  1. Gateway reads all REP_* environment variables (+ optional .env file)
+  2. Classifies into PUBLIC / SENSITIVE / SERVER tiers (by prefix)
+  3. Runs guardrails (entropy scan, known format detection) on PUBLIC vars
+  4. Generates ephemeral AES-256 key + HMAC secret (in-memory only)
+  5. Encrypts SENSITIVE vars → base64 blob
+  6. Computes HMAC integrity token
+  7. Pre-renders <script id="__rep__" type="application/json"> tag
+```
+
+## Gateway modes
+
+### Proxy mode (recommended)
+
+The gateway sits in front of an existing web server (nginx, Caddy, etc.) and intercepts HTML responses:
+
+```
+Browser → [REP Gateway :8080] → [nginx / Caddy :80]
+```
+
+For `text/html` responses, the gateway injects the payload before `</head>`. All other responses pass through unmodified.
+
+### Embedded mode
+
+The gateway serves static files directly — no upstream server needed:
+
+```
+Browser → [REP Gateway :8080] (serves files from --static-dir)
+```
+
+This enables `FROM scratch` Docker containers: just the gateway binary and your `dist/` folder. No nginx, no Node.js, no shell.
+
+## Startup sequence
+
+The gateway performs these steps in order at process start:
+
+1. Load `.env` file if `--env-file` is specified (existing env vars take precedence)
+2. Read all `REP_*` environment variables
+3. Classify each into PUBLIC, SENSITIVE, or SERVER tier
+4. Validate name uniqueness after prefix stripping
+5. Load and validate `.rep.yaml` manifest if `--manifest` is specified
+6. Run secret detection guardrails on PUBLIC variables
+7. Exit with error if `--strict` and guardrails triggered
+8. Generate ephemeral master key, derive AES-256 key via HKDF-SHA256
+9. Encrypt all SENSITIVE values with AES-256-GCM
+10. Compute HMAC-SHA256 integrity token
+11. Construct the payload JSON
+12. Register HTTP handlers (injection, session key, health, hot reload)
+13. Start accepting connections
+14. Log startup summary
+
+<Aside type="tip">
+  Ephemeral keys are regenerated on every restart. A gateway restart invalidates all previously issued session keys and re-encrypts the sensitive blob. This is by design — key compromise requires process compromise.
+</Aside>
+
+## HTML injection
+
+When the gateway intercepts an HTML response, it injects a `<script>` block:
+
+```html
+<script id="__rep__" type="application/json"
+        data-rep-version="0.1.0"
+        data-rep-integrity="sha256-{base64_hash}">
+{
+  "public": {
+    "API_URL": "https://api.example.com",
+    "FEATURE_FLAGS": "dark-mode,beta"
+  },
+  "sensitive": "{base64_aes_gcm_blob}",
+  "_meta": {
+    "version": "0.1.0",
+    "injected_at": "2026-02-18T14:30:00.000Z",
+    "integrity": "hmac-sha256:{base64_signature}",
+    "key_endpoint": "/rep/session-key",
+    "hot_reload": "/rep/changes",
+    "ttl": 0
+  }
+}
+</script>
+```
+
+**Injection rules:**
+
+1. Insert before `</head>` (preferred)
+2. If no `</head>`, insert after `<head>`
+3. If neither exists, prepend to the response body
+
+<Aside type="caution">
+  `type="application/json"` is critical — it prevents the browser from executing the tag. This is inert data, not executable JavaScript. Never change this to `text/javascript`.
+</Aside>
+
+## SDK initialization
+
+The SDK reads the injected payload **synchronously** on import:
+
+1. Locate `<script id="__rep__">` in the DOM
+2. Parse the JSON content
+3. Verify `data-rep-integrity` against the content (async, non-blocking)
+4. Freeze the `public` object
+5. Set internal state flags (`_available`, `_tampered`)
+
+No network calls happen during initialization. `rep.get()` is available immediately — before your first component renders.
+
+## Gateway endpoints
+
+The gateway exposes three endpoints alongside HTML injection:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /rep/health` | Health check — variable counts, guardrail status, uptime |
+| `GET /rep/session-key` | Short-lived AES decryption key for SENSITIVE variables |
+| `GET /rep/changes` | SSE stream for hot reload (if enabled) |
+
+See the [Gateway Endpoints reference](/reference/gateway-endpoints/) for full details.

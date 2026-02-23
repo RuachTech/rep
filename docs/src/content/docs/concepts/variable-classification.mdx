@@ -1,0 +1,91 @@
+---
+title: Variable Classification
+description: The three-tier security model — PUBLIC, SENSITIVE, and SERVER variables.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+REP classifies every environment variable into one of three security tiers based on its prefix. This is the foundational design decision — it forces an explicit security choice for every variable.
+
+## The three tiers
+
+| Prefix | Tier | Behaviour | SDK Access |
+|---|---|---|---|
+| `REP_PUBLIC_*` | **PUBLIC** | Plaintext JSON in page source | `rep.get('KEY')` (sync) |
+| `REP_SENSITIVE_*` | **SENSITIVE** | AES-256-GCM encrypted blob | `await rep.getSecure('KEY')` |
+| `REP_SERVER_*` | **SERVER** | Never sent to client | N/A |
+| `REP_GATEWAY_*` | *(config)* | Gateway configuration, not app vars | N/A |
+
+Variables without a `REP_` prefix are ignored by the gateway entirely. This prevents accidental exposure of system variables like `PATH`, `HOME`, or database credentials.
+
+## Classification rules
+
+1. Classification is determined **exclusively by prefix**. There is no override mechanism.
+2. The gateway will not inject any variable without a `REP_` prefix.
+3. Prefixes are stripped before injection: `REP_PUBLIC_API_URL` becomes `API_URL` in the payload.
+4. Names must be unique after stripping. If `REP_PUBLIC_API_URL` and `REP_SENSITIVE_API_URL` both exist, the gateway refuses to start.
+
+## Decision tree
+
+Use this guide to classify each variable:
+
+```
+Does the value contain credentials, tokens, or keys?
+├── Yes → Does it need to reach the browser at all?
+│         ├── No  → REP_SERVER_*
+│         └── Yes → REP_SENSITIVE_*
+└── No  → Is it configuration the app needs at runtime?
+          ├── Yes → REP_PUBLIC_*
+          └── No  → REP_SERVER_* or don't use REP_ prefix
+```
+
+## Common misclassifications
+
+| Variable | Wrong Tier | Correct Tier | Reason |
+|---|---|---|---|
+| `DATABASE_URL` | PUBLIC | **SERVER** | Database credentials must never reach the browser |
+| `STRIPE_SECRET_KEY` | SENSITIVE | **SERVER** | Secret keys should never be decryptable client-side |
+| `STRIPE_PUBLISHABLE_KEY` | SERVER | **PUBLIC** | Publishable keys are designed to be public |
+| `API_URL` | SENSITIVE | **PUBLIC** | API endpoints are visible in network requests anyway |
+| `JWT_SECRET` | SENSITIVE | **SERVER** | Signing secrets must stay server-side |
+| `OAUTH_CLIENT_ID` | SERVER | **SENSITIVE** | Client IDs are needed browser-side but not public |
+| `ANALYTICS_WRITE_KEY` | PUBLIC | **SENSITIVE** | Write keys allow data ingestion — encrypt them |
+| `FEATURE_FLAGS` | SENSITIVE | **PUBLIC** | Feature flag names have no security value |
+| `SENTRY_DSN` | PUBLIC | **SENSITIVE** | DSNs contain project-specific ingestion endpoints |
+| `APP_VERSION` | SENSITIVE | **PUBLIC** | Version strings are informational, not secret |
+| `INTERNAL_SERVICE_TOKEN` | SENSITIVE | **SERVER** | Service-to-service tokens must not reach the browser |
+| `CDN_BASE_URL` | SENSITIVE | **PUBLIC** | CDN URLs are visible in every asset request |
+
+<Aside type="tip">
+  When in doubt, start with the most restrictive tier (SERVER) and relax only when you can articulate why the browser needs the value.
+</Aside>
+
+## Automatic secret detection (guardrails)
+
+At startup, the gateway scans all `REP_PUBLIC_*` values for patterns indicating potential misclassification:
+
+| Detection | Description |
+|---|---|
+| **Shannon entropy > 4.5** | Random-looking strings typical of API keys and tokens |
+| **Known key formats** | AWS keys (`AKIA...`), JWTs (`eyJ...`), GitHub tokens (`ghp_...`), Stripe keys (`sk_live_...`), private keys (`-----BEGIN`) |
+| **Length anomalies** | Strings > 64 characters that may be encoded secrets |
+
+When a potential misclassification is detected:
+
+- The gateway logs a **WARNING** with the variable name (never the value)
+- In `--strict` mode, the gateway refuses to start
+- The gateway never silently changes classification — you must fix the prefix
+
+<Aside type="caution">
+  Guardrails use heuristics, not certainty. A low-entropy secret (like a short password) may not trigger detection. Use `--strict` mode in production and review your `.rep.yaml` manifest in code review.
+</Aside>
+
+## Manifest validation
+
+When a `.rep.yaml` manifest is present, the gateway can validate at startup that:
+
+- All required variables are present in the environment
+- Variable values match declared types (url, number, enum, etc.)
+- Variables are in the correct tier
+
+See the [Manifest guide](/guides/manifest/) for details.

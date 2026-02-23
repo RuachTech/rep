@@ -1,0 +1,145 @@
+---
+title: Testing
+description: Unit testing with mock payloads, integration testing with Docker, and E2E testing patterns.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Unit testing
+
+Create a helper that mocks the REP payload for your test environment:
+
+```typescript
+// test/helpers/mock-rep.ts
+export function mockRepPayload(vars: Record<string, string>) {
+  // Remove any existing mock
+  document.getElementById('__rep__')?.remove();
+
+  const script = document.createElement('script');
+  script.id = '__rep__';
+  script.type = 'application/json';
+
+  const payload = {
+    public: vars,
+    _meta: {
+      version: '0.1.0',
+      injected_at: new Date().toISOString(),
+      integrity: 'hmac-sha256:test-mode',
+      ttl: 0,
+    },
+  };
+
+  script.textContent = JSON.stringify(payload);
+  document.head.appendChild(script);
+}
+```
+
+### Using with Vitest
+
+```typescript
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { mockRepPayload } from '../helpers/mock-rep';
+
+describe('Config-dependent component', () => {
+  beforeEach(() => {
+    // Reset module cache — SDK's _init() runs on import
+    vi.resetModules();
+    document.head.innerHTML = '';
+    document.body.innerHTML = '';
+  });
+
+  it('reads API_URL from REP payload', async () => {
+    mockRepPayload({ API_URL: 'https://api.test.com' });
+
+    // Dynamic import gets a fresh SDK instance
+    const { rep } = await import('@rep-protocol/sdk');
+    expect(rep.get('API_URL')).toBe('https://api.test.com');
+  });
+
+  it('returns default when payload is absent', async () => {
+    const { rep } = await import('@rep-protocol/sdk');
+    expect(rep.get('API_URL', 'fallback')).toBe('fallback');
+  });
+});
+```
+
+<Aside type="tip">
+  The SDK's `_init()` function runs on module load. Use `vi.resetModules()` and dynamic `import()` in each test to get a fresh SDK instance that reads the current DOM state.
+</Aside>
+
+### Vitest configuration
+
+```typescript
+// vitest.config.ts
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    environment: 'jsdom',
+  },
+});
+```
+
+## Integration testing
+
+Use Docker Compose to test with a real gateway:
+
+```yaml
+# docker-compose.test.yml
+services:
+  app:
+    build: .
+    environment:
+      REP_PUBLIC_API_URL: "http://api:3000"
+      REP_PUBLIC_FEATURE_FLAGS: "all"
+      REP_SENSITIVE_ANALYTICS_KEY: "test-key"
+    ports:
+      - "8080:8080"
+
+  api:
+    image: your-api:test
+    ports:
+      - "3000:3000"
+```
+
+```bash
+docker compose -f docker-compose.test.yml up -d
+npx playwright test --base-url http://localhost:8080
+docker compose -f docker-compose.test.yml down
+```
+
+## Health check testing
+
+Verify the gateway is running and configured correctly:
+
+```bash
+curl -s http://localhost:8080/rep/health | jq
+```
+
+Expected output:
+```json
+{
+  "status": "healthy",
+  "version": "0.1.0",
+  "variables": {
+    "public": 3,
+    "sensitive": 1,
+    "server": 2
+  },
+  "guardrails": {
+    "warnings": 0,
+    "blocked": 0
+  },
+  "uptime_seconds": 42
+}
+```
+
+## Bundle scanning
+
+Use `rep lint` in CI to catch accidentally leaked secrets in build output:
+
+```bash
+rep lint --dir ./dist --strict
+```
+
+This runs the same entropy and pattern detection as the gateway guardrails, but against your compiled JavaScript bundles. Add it as a CI step to prevent deployment of bundles containing secrets.

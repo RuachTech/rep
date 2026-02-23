@@ -1,0 +1,45 @@
+---
+title: Specification Overview
+description: REP formal specification documents — RFC, Security Model, and Conformance.
+---
+
+REP is defined by three specification documents. They are the authoritative reference for the protocol, its security properties, and its conformance requirements.
+
+## Documents
+
+| Document | Status | Version | Description |
+|---|---|---|---|
+| [REP-RFC-0001](/spec/rfc-0001/) | Active | 0.1.0 | Core protocol specification — variable classification, gateway architecture, SDK API, wire format, deployment patterns |
+| [Security Model](/spec/security-model/) | Active | 0.1.0 | Threat model, 7 threat analyses, hardening recommendations, known limitations |
+| [Conformance](/spec/conformance/) | Active | 0.1.0 | Requirements for conformant gateway and SDK implementations |
+
+## Versioning policy
+
+The specification uses semantic versioning:
+
+- **Patch** (0.1.x): Clarifications, typo fixes, non-normative additions
+- **Minor** (0.x.0): New optional features, backwards-compatible extensions
+- **Major** (x.0.0): Breaking changes to the wire format, API surface, or security model
+
+The current version (0.1.0) indicates the specification is active and subject to refinement based on implementation experience. Breaking changes are possible before 1.0.
+
+## License
+
+Specification documents are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Reference implementations (gateway, SDK, CLI, adapters) are licensed under [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+
+## JSON schemas
+
+Machine-readable schemas are published for integration and validation:
+
+- [Payload schema](/schema/rep-payload.schema.json) — validates the injected `<script>` JSON
+- [Manifest schema](/schema/rep-manifest.schema.json) — validates `.rep.yaml` files
+
+## References
+
+- [The Twelve-Factor App — Factor III: Config](https://12factor.net/config)
+- [OCI Image Specification](https://github.com/opencontainers/image-spec)
+- [RFC 5869 — HKDF](https://tools.ietf.org/html/rfc5869)
+- [Web Crypto API](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto)
+- [Subresource Integrity (SRI)](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity)
+- [Server-Sent Events](https://html.spec.whatwg.org/multipage/server-sent-events.html)
+- [Content Security Policy Level 3](https://www.w3.org/TR/CSP3/)

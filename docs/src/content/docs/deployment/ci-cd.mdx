@@ -1,0 +1,123 @@
+---
+title: CI/CD Pipeline
+description: Build once, deploy everywhere — same image across staging and production.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## The fundamental shift
+
+With REP, your CI/CD pipeline changes from "build per environment" to "build once, promote everywhere":
+
+**Before REP:**
+```
+Build (staging) → Test → Deploy to staging
+Build (prod)    → Deploy to prod  ← DIFFERENT BINARY
+```
+
+**After REP:**
+```
+Build (once) → Test → Deploy to staging (with staging env vars)
+                    → Promote SAME IMAGE to prod (with prod env vars)
+```
+
+The image that passed your tests is the **exact same binary** that goes to production.
+
+## GitHub Actions example
+
+```yaml
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build frontend (environment-agnostic)
+        run: |
+          docker build -t myapp:${{ github.sha }} .
+          # No --build-arg for API_URL, no .env files
+          # The image is environment-agnostic
+
+      - name: Push to registry
+        run: docker push ghcr.io/myorg/myapp:${{ github.sha }}
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run E2E tests
+        run: |
+          docker run -d --name test-app \
+            -e REP_PUBLIC_API_URL=https://api.test.example.com \
+            -e REP_PUBLIC_FEATURE_FLAGS=all \
+            -p 8080:8080 \
+            ghcr.io/myorg/myapp:${{ github.sha }}
+
+          npx playwright test --base-url http://localhost:8080
+
+  deploy-staging:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to staging
+        run: |
+          kubectl set image deployment/frontend \
+            frontend=ghcr.io/myorg/myapp:${{ github.sha }}
+          # ConfigMap provides staging REP_PUBLIC_* and REP_SENSITIVE_* vars
+
+  deploy-prod:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production  # Requires manual approval
+    steps:
+      - name: Promote SAME IMAGE to production
+        run: |
+          # SAME SHA — exact same binary that was tested
+          kubectl set image deployment/frontend \
+            frontend=ghcr.io/myorg/myapp:${{ github.sha }}
+          # Different ConfigMap provides prod REP_* vars
+```
+
+## Manifest validation in CI
+
+Add a validation step to catch configuration errors early:
+
+```yaml
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate REP manifest
+        run: npx @rep-protocol/cli validate --manifest .rep.yaml
+```
+
+This checks that:
+- The manifest schema is valid
+- No naming collisions after prefix stripping
+- All type constraints are properly declared
+
+## Bundle scanning in CI
+
+Scan built bundles for accidentally leaked secrets:
+
+```yaml
+  lint:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: npm ci && npm run build
+      - name: Scan for secrets
+        run: npx @rep-protocol/cli lint --dir ./dist --strict
+```
+
+<Aside type="tip">
+  Combine `rep validate` and `rep lint` as required CI checks. Validation catches schema issues at commit time; lint catches leaked secrets at build time.
+</Aside>

@@ -1,0 +1,77 @@
+---
+title: Docker — Proxy Mode
+description: Run the REP gateway as a reverse proxy in front of nginx or Caddy.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+In proxy mode, the gateway sits in front of your existing web server and injects variables into HTML responses.
+
+```
+Browser → [REP Gateway :8080] → [nginx :80]
+```
+
+## Dockerfile
+
+```dockerfile
+# Stage 1: Build the frontend
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Stage 2: nginx + REP gateway
+FROM nginx:alpine
+
+# Copy built assets to nginx
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# Add the REP gateway binary
+COPY --from=ghcr.io/ruachtech/rep/gateway:latest \
+  /usr/local/bin/rep-gateway /usr/local/bin/rep-gateway
+
+EXPOSE 8080
+
+ENTRYPOINT ["rep-gateway"]
+CMD ["--mode", "proxy", "--upstream", "localhost:80", "--port", "8080"]
+```
+
+## Running
+
+```bash
+docker build -t myapp .
+
+# Staging
+docker run -p 8080:8080 \
+  -e REP_PUBLIC_API_URL=https://api.staging.example.com \
+  -e REP_PUBLIC_FEATURE_FLAGS=dark-mode,beta \
+  -e REP_SENSITIVE_ANALYTICS_KEY=UA-XXXXX-staging \
+  myapp
+
+# Production — SAME IMAGE
+docker run -p 8080:8080 \
+  -e REP_PUBLIC_API_URL=https://api.example.com \
+  -e REP_PUBLIC_FEATURE_FLAGS=dark-mode \
+  -e REP_SENSITIVE_ANALYTICS_KEY=UA-XXXXX-prod \
+  -e REP_GATEWAY_STRICT=true \
+  myapp
+```
+
+## How it works
+
+1. nginx starts and serves static files on port 80 (inside the container)
+2. The gateway starts and proxies all requests to `localhost:80`
+3. For `text/html` responses, the gateway intercepts and injects the REP payload
+4. All other responses (JS, CSS, images) pass through unmodified
+
+<Aside>
+  The gateway strips `Accept-Encoding` from proxied requests so upstreams respond with identity encoding. This avoids decompress/recompress overhead. The gateway handles gzip compression for non-compliant upstreams via stdlib.
+</Aside>
+
+## When to use proxy mode
+
+- You need nginx features (gzip, caching headers, URL rewriting, basic auth)
+- You're adding REP to an existing deployment with minimal changes
+- Your infrastructure team prefers nginx/Caddy for static file serving

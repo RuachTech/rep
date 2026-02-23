@@ -1,0 +1,132 @@
+---
+title: Docker Compose
+description: Local multi-service setup with Docker Compose — same image, different config.
+---
+
+## Basic setup
+
+```yaml
+# docker-compose.yml
+services:
+  frontend:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      REP_PUBLIC_API_URL: "http://localhost:3000"
+      REP_PUBLIC_FEATURE_FLAGS: "dark-mode,debug"
+      REP_SENSITIVE_ANALYTICS_KEY: "test-key"
+```
+
+## Same image, multiple environments
+
+The core value proposition — one image, different config per environment:
+
+```yaml
+services:
+  frontend-staging:
+    image: myapp:latest
+    ports:
+      - "8080:8080"
+    environment:
+      REP_PUBLIC_API_URL: "https://api.staging.example.com"
+      REP_PUBLIC_FEATURE_FLAGS: "dark-mode,beta-checkout"
+      REP_PUBLIC_ENV_NAME: "staging"
+      REP_SENSITIVE_ANALYTICS_KEY: "UA-XXXXX-staging"
+      REP_SERVER_INTERNAL_SECRET: "staging-secret"
+
+  frontend-prod:
+    image: myapp:latest  # SAME IMAGE
+    ports:
+      - "8081:8080"
+    environment:
+      REP_PUBLIC_API_URL: "https://api.example.com"
+      REP_PUBLIC_FEATURE_FLAGS: "dark-mode"
+      REP_PUBLIC_ENV_NAME: "production"
+      REP_SENSITIVE_ANALYTICS_KEY: "UA-XXXXX-prod"
+      REP_SERVER_INTERNAL_SECRET: "prod-secret"
+      REP_GATEWAY_STRICT: "true"
+```
+
+## With .env files
+
+```yaml
+services:
+  frontend:
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env.local
+```
+
+`.env.local`:
+```bash
+REP_PUBLIC_API_URL=http://localhost:3000
+REP_PUBLIC_FEATURE_FLAGS=dark-mode,debug
+REP_SENSITIVE_ANALYTICS_KEY=test-key-123
+```
+
+## Development with proxy mode
+
+Run the gateway as a proxy to your Vite dev server:
+
+```yaml
+services:
+  vite:
+    build:
+      context: .
+      target: dev
+    command: npm run dev -- --host
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+  gateway:
+    image: ghcr.io/ruachtech/rep/gateway:latest
+    ports:
+      - "8080:8080"
+    environment:
+      REP_PUBLIC_API_URL: "http://localhost:3000"
+      REP_GATEWAY_MODE: "proxy"
+      REP_GATEWAY_UPSTREAM: "vite:5173"
+      REP_GATEWAY_HOT_RELOAD: "true"
+    depends_on:
+      - vite
+```
+
+Access the app at `http://localhost:8080` to see REP-injected variables.
+
+## Full stack example
+
+```yaml
+services:
+  frontend:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      REP_PUBLIC_API_URL: "http://localhost:3000"
+      REP_PUBLIC_FEATURE_FLAGS: "all"
+      REP_SENSITIVE_ANALYTICS_KEY: "test-key"
+    depends_on:
+      - api
+
+  api:
+    image: your-api:latest
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgres://user:pass@db:5432/app"
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: app
+```

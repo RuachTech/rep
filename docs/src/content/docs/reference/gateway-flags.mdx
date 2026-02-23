@@ -1,0 +1,92 @@
+---
+title: Gateway Flags
+description: All CLI flags and environment variables for configuring the REP gateway.
+---
+
+The gateway is configured via command-line flags or environment variables. Flags take precedence over env vars.
+
+## Command-line flags
+
+```
+rep-gateway [flags]
+```
+
+| Flag | Default | Description |
+|---|---|---|
+| `--mode` | `proxy` | Operating mode: `proxy` or `embedded` |
+| `--upstream` | `localhost:80` | Upstream server address (proxy mode only) |
+| `--port` | `8080` | Listen port |
+| `--static-dir` | `/usr/share/nginx/html` | Static file directory (embedded mode only) |
+| `--manifest` | — | Path to `.rep.yaml` manifest file |
+| `--env-file` | — | Path to `.env` file (env vars take precedence) |
+| `--strict` | `false` | Exit on guardrail warnings |
+| `--hot-reload` | `false` | Enable hot reload SSE endpoint |
+| `--hot-reload-mode` | `signal` | Detection mode: `file_watch`, `signal`, `poll` |
+| `--watch-path` | — | Path to watch for changes (file_watch mode) |
+| `--poll-interval` | `30s` | Config poll interval (poll mode) |
+| `--log-format` | `json` | Log format: `json` or `text` |
+| `--log-level` | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `--allowed-origins` | — | Comma-separated CORS origins for `/rep/session-key` |
+| `--tls-cert` | — | Path to TLS certificate |
+| `--tls-key` | — | Path to TLS private key |
+| `--health-port` | — | Separate port for health check endpoint |
+
+## Environment variables
+
+Every flag can be set via environment variable with the `REP_GATEWAY_` prefix:
+
+```bash
+REP_GATEWAY_MODE=proxy
+REP_GATEWAY_UPSTREAM=localhost:80
+REP_GATEWAY_PORT=8080
+REP_GATEWAY_STRICT=true
+REP_GATEWAY_HOT_RELOAD=true
+REP_GATEWAY_HOT_RELOAD_MODE=signal
+REP_GATEWAY_LOG_FORMAT=json
+REP_GATEWAY_LOG_LEVEL=info
+REP_GATEWAY_ALLOWED_ORIGINS=https://app.example.com,https://staging.example.com
+```
+
+## Precedence order
+
+1. Command-line flags (highest)
+2. Environment variables (`REP_GATEWAY_*`)
+3. Manifest file settings (lowest)
+
+## Common configurations
+
+### Proxy mode (development)
+
+```bash
+rep-gateway \
+  --mode proxy \
+  --upstream localhost:5173 \
+  --port 8080 \
+  --hot-reload
+```
+
+### Embedded mode (production)
+
+```bash
+rep-gateway \
+  --mode embedded \
+  --static-dir /static \
+  --port 8080 \
+  --strict \
+  --log-format json \
+  --allowed-origins https://app.example.com
+```
+
+### Kubernetes sidecar
+
+```bash
+rep-gateway \
+  --mode proxy \
+  --upstream localhost:80 \
+  --port 8080 \
+  --strict \
+  --hot-reload \
+  --hot-reload-mode file_watch \
+  --watch-path /config \
+  --health-port 9090
+```

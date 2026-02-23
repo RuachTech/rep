@@ -1,0 +1,102 @@
+---
+title: Angular
+description: Use REP with Angular — Injectable RepService with Observable support.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside>
+  There is no published `@rep-protocol/angular` package. Angular integration uses the core SDK directly via a service pattern shown below.
+</Aside>
+
+## Installation
+
+```bash
+npm install @rep-protocol/sdk
+```
+
+## Create a RepService
+
+```typescript
+// src/app/services/rep.service.ts
+import { Injectable } from '@angular/core';
+import { rep } from '@rep-protocol/sdk';
+import { BehaviorSubject, Observable } from 'rxjs';
+
+@Injectable({ providedIn: 'root' })
+export class RepService {
+  get(key: string, defaultValue?: string): string | undefined {
+    return rep.get(key, defaultValue);
+  }
+
+  getSecure(key: string): Promise<string> {
+    return rep.getSecure(key);
+  }
+
+  watch(key: string): Observable<string | undefined> {
+    const subject = new BehaviorSubject(rep.get(key));
+    rep.onChange(key, (newVal) => subject.next(newVal));
+    return subject.asObservable();
+  }
+}
+```
+
+## Usage in components
+
+```typescript
+// src/app/components/config-display.component.ts
+import { Component, OnInit } from '@angular/core';
+import { RepService } from '../services/rep.service';
+import { Observable } from 'rxjs';
+
+@Component({
+  selector: 'app-config-display',
+  template: `
+    <div>
+      <p>API: {{ apiUrl }}</p>
+      <p>Flags: {{ flags$ | async }}</p>
+      <p>Analytics: {{ analyticsKey ?? 'loading...' }}</p>
+    </div>
+  `,
+})
+export class ConfigDisplayComponent implements OnInit {
+  apiUrl: string | undefined;
+  flags$: Observable<string | undefined>;
+  analyticsKey: string | null = null;
+
+  constructor(private rep: RepService) {
+    // Synchronous — available immediately
+    this.apiUrl = this.rep.get('API_URL', 'http://localhost:3000');
+
+    // Observable — updates on hot reload
+    this.flags$ = this.rep.watch('FEATURE_FLAGS');
+  }
+
+  async ngOnInit() {
+    // Async — encrypted, decrypted on demand
+    this.analyticsKey = await this.rep.getSecure('ANALYTICS_KEY');
+  }
+}
+```
+
+## How it works
+
+- `get()` calls `rep.get()` from the core SDK — synchronous, no loading state
+- `getSecure()` calls `rep.getSecure()` — fetches a session key, decrypts, caches
+- `watch()` wraps `rep.onChange()` into a `BehaviorSubject` for Angular's `async` pipe
+
+## Development mode
+
+Without the gateway, `rep.get()` returns `undefined`. Use default values:
+
+```typescript
+this.apiUrl = this.rep.get('API_URL', 'http://localhost:3000');
+```
+
+Or add a mock payload to your `index.html` during development:
+
+```html
+<script id="__rep__" type="application/json">
+{"public":{"API_URL":"http://localhost:3000"},"_meta":{"version":"0.1.0","injected_at":"2026-01-01T00:00:00Z","integrity":"hmac-sha256:dev","ttl":0}}
+</script>
+```

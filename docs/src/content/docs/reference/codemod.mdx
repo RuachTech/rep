@@ -1,0 +1,96 @@
+---
+title: Codemod
+description: Reference for @rep-protocol/codemod — automated migration from Vite, CRA, and Next.js.
+---
+
+```bash
+npm install -D @rep-protocol/codemod
+# or
+npx @rep-protocol/codemod [options] [files...]
+```
+
+## Usage
+
+```bash
+rep-codemod [options] [files or directories...]
+```
+
+## Options
+
+| Flag | Default | Description |
+|---|---|---|
+| `-f, --framework <name>` | `vite` | Framework preset: `vite`, `cra`, `next` |
+| `--dry-run` | `false` | Preview changes without writing files |
+| `--extensions <list>` | `ts,tsx,js,jsx` | Comma-separated file extensions to process |
+
+## Framework presets
+
+### `--framework vite`
+
+Transforms `import.meta.env.VITE_*` to `rep.get('*')`:
+
+```typescript
+// Before
+const apiUrl = import.meta.env.VITE_API_URL;
+
+// After
+import { rep } from '@rep-protocol/sdk';
+const apiUrl = rep.get('API_URL');
+```
+
+Vite built-ins (`MODE`, `DEV`, `PROD`, `SSR`, `BASE_URL`) are left untouched.
+
+### `--framework cra`
+
+Transforms `process.env.REACT_APP_*` to `rep.get('*')`:
+
+```typescript
+// Before
+const apiUrl = process.env.REACT_APP_API_URL;
+
+// After
+import { rep } from '@rep-protocol/sdk';
+const apiUrl = rep.get('API_URL');
+```
+
+### `--framework next`
+
+Transforms `process.env.NEXT_PUBLIC_*` to `rep.get('*')`:
+
+```typescript
+// Before
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+// After
+import { rep } from '@rep-protocol/sdk';
+const apiUrl = rep.get('API_URL');
+```
+
+## Examples
+
+```bash
+# Transform Vite project
+rep-codemod --framework vite src/
+
+# Dry run — preview changes
+rep-codemod --framework cra --dry-run src/components/
+
+# Specific files
+rep-codemod --framework next src/app/page.tsx src/lib/api.ts
+
+# JavaScript files only
+rep-codemod --framework vite --extensions js,jsx src/
+```
+
+## Behavior
+
+- **Idempotent** — running twice produces the same result
+- **Import management** — adds `import { rep } from '@rep-protocol/sdk'` if absent
+- **Non-destructive** — only prefixed variables are transformed
+- **Format-preserving** — original formatting and comments are preserved (via jscodeshift/recast)
+
+## Post-migration steps
+
+1. Remove framework-specific type augmentations (e.g., `vite-env.d.ts`)
+2. Run `rep typegen` to generate typed overloads
+3. Update container config to set `REP_PUBLIC_*` environment variables

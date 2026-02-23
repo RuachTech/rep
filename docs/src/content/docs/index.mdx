@@ -1,0 +1,145 @@
+---
+title: REP — Runtime Environment Protocol
+description: Build once. Configure anywhere. Securely. Inject environment variables into browser apps at container runtime.
+template: splash
+hero:
+  tagline: Inject environment variables into browser apps at container runtime — with security classification, encryption, and integrity verification.
+  actions:
+    - text: Quick Start
+      link: /quick-start/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/ruachtech/rep
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
+## The Problem
+
+Every frontend framework resolves environment variables at **build time** via static string replacement. The resulting bundle is environment-specific — a bundle built for staging cannot be reused in production without rebuilding.
+
+> **Containers are designed to be environment-agnostic artifacts, but frontend builds are environment-specific artifacts.**
+
+This means: one image per environment, broken CI/CD promotion, config changes require redeployment, and no security model for variables.
+
+## What REP Does Differently
+
+REP operates at the **infrastructure layer** — no build-tool plugins, no framework coupling. A lightweight Go gateway binary reads environment variables at container startup, classifies them by security tier, and injects them into HTML responses.
+
+<CardGrid>
+  <Card title="Security Classification" icon="approve-check">
+    Three tiers: PUBLIC (plaintext), SENSITIVE (encrypted), SERVER (never sent). Prefix-based — no ambiguity.
+  </Card>
+  <Card title="Encrypted Variables" icon="lock">
+    Sensitive vars are AES-256-GCM encrypted. Decrypted via single-use, rate-limited session keys.
+  </Card>
+  <Card title="Integrity Verification" icon="shield">
+    HMAC-SHA256 integrity token + SRI hashing on every payload. Detect tampering in transit.
+  </Card>
+  <Card title="Hot Reload" icon="refresh">
+    Config changes push to the browser via SSE — no page reload, no redeployment.
+  </Card>
+</CardGrid>
+
+## Compared to Existing Solutions
+
+| Approach | Security Model | Encrypted Vars | Integrity Check | Framework Agnostic | Standalone Binary |
+|---|:---:|:---:|:---:|:---:|:---:|
+| `envsubst` / `sed` on bundles | -- | -- | -- | Yes | -- |
+| Fetch `/config.json` | -- | -- | -- | Yes | -- |
+| `window.__ENV__` via shell script | -- | -- | -- | Partial | -- |
+| Build-tool plugins | -- | -- | -- | -- | -- |
+| **REP** | **3-tier** | **AES-256-GCM** | **HMAC + SRI** | **Yes** | **~3MB Go** |
+
+## How It Works
+
+```
+Container boot → Gateway reads REP_* env vars → Classifies → Encrypts sensitive → Signs payload
+
+Request: Browser → [REP Gateway :8080] → [Upstream :80]
+         HTML responses get <script id="__rep__"> injected before </head>
+         All other responses pass through unmodified
+```
+
+## Quick Example
+
+<Tabs>
+  <TabItem label="SDK Usage">
+```typescript
+import { rep } from '@rep-protocol/sdk';
+
+// Synchronous — no loading state needed
+const apiUrl = rep.get('API_URL');
+const flags = rep.get('FEATURE_FLAGS');
+
+// Encrypted — decrypted on demand
+const key = await rep.getSecure('ANALYTICS_KEY');
+
+// Hot reload — react to config changes
+rep.onChange('FEATURE_FLAGS', (newValue) => {
+  console.log('Flags updated:', newValue);
+});
+```
+  </TabItem>
+  <TabItem label="Docker Compose">
+```yaml
+# Same image, different config
+services:
+  frontend-staging:
+    image: myapp:latest
+    environment:
+      REP_PUBLIC_API_URL: "https://api.staging.example.com"
+      REP_SENSITIVE_ANALYTICS_KEY: "UA-XXXXX-staging"
+      REP_SERVER_INTERNAL_SECRET: "never-reaches-browser"
+
+  frontend-prod:
+    image: myapp:latest  # SAME IMAGE
+    environment:
+      REP_PUBLIC_API_URL: "https://api.example.com"
+      REP_SENSITIVE_ANALYTICS_KEY: "UA-XXXXX-prod"
+      REP_SERVER_INTERNAL_SECRET: "also-never-reaches-browser"
+```
+  </TabItem>
+  <TabItem label="Variable Tiers">
+```bash
+# PUBLIC — plaintext in page source, rep.get()
+REP_PUBLIC_API_URL=https://api.example.com
+
+# SENSITIVE — encrypted, await rep.getSecure()
+REP_SENSITIVE_ANALYTICS_KEY=UA-12345-1
+
+# SERVER — never leaves the gateway process
+REP_SERVER_DB_PASSWORD=never-reaches-browser
+```
+  </TabItem>
+</Tabs>
+
+## Project Components
+
+<CardGrid>
+  <Card title="Gateway" icon="rocket">
+    Go binary (~3MB). Zero dependencies. `FROM scratch` compatible. Proxy or embedded mode.
+  </Card>
+  <Card title="SDK" icon="document">
+    TypeScript. Zero runtime deps. ~1.5KB gzipped. Synchronous `get()`, async `getSecure()`.
+  </Card>
+  <Card title="CLI" icon="terminal">
+    `rep validate`, `rep typegen`, `rep lint`, `rep dev`. Full development workflow.
+  </Card>
+  <Card title="Adapters" icon="puzzle">
+    First-party React, Vue, and Svelte adapters with hot-reload-aware hooks/stores.
+  </Card>
+</CardGrid>
+
+## Specification Status
+
+| Document | Status | Version |
+|---|---|---|
+| [REP-RFC-0001](/spec/rfc-0001/) | Active | 0.1.0 |
+| [Security Model](/spec/security-model/) | Active | 0.1.0 |
+| [Conformance](/spec/conformance/) | Active | 0.1.0 |
+
+Specification documents are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Code is licensed under [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).

@@ -1,0 +1,167 @@
+---
+title: Security Model
+description: Threat analysis, trust boundaries, and what REP protects against (and what it doesn't).
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+REP does not claim to make browser-side configuration "secure" in an absolute sense. It makes it **significantly more secure than the status quo** while making security trade-offs explicit and auditable.
+
+## Fundamental axiom
+
+> **Anything that reaches the browser is ultimately accessible to the user and to any code running in the browser context.**
+
+REP cannot change this axiom. What it does is:
+
+1. **Prevent accidental exposure** through classification and guardrails
+2. **Raise the bar for casual extraction** through encryption of sensitive values
+3. **Make intentional access auditable** through session key logging and rate limiting
+4. **Eliminate unnecessary exposure** through the SERVER tier
+5. **Detect tampering** through integrity verification
+
+## Trust boundaries
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                    TRUSTED ZONE                                │
+│                                                                │
+│  Orchestrator (K8s, ECS)                                       │
+│       ↓                                                        │
+│  REP Gateway (Go binary) → Static File Server (nginx)         │
+│                                                                │
+│  REP_SERVER_* vars NEVER cross this boundary                   │
+├────────────────────────────────────────────────────────────────┤
+│                    TRANSIT (HTTPS/TLS)                          │
+├────────────────────────────────────────────────────────────────┤
+│                    UNTRUSTED ZONE                               │
+│                                                                │
+│  Browser: Application Code, REP SDK, Extensions, DevTools      │
+│  Everything here is visible to the user                        │
+└────────────────────────────────────────────────────────────────┘
+```
+
+## Threat analysis
+
+### T1: Accidental secret exposure (HIGH)
+
+A developer prefixes a database password with `REP_PUBLIC_` instead of `REP_SERVER_`.
+
+**Mitigations:**
+- Naming convention forces an explicit classification decision
+- Guardrail scanning detects secret-like patterns in PUBLIC values
+- `--strict` mode makes guardrail warnings into hard failures
+- Manifest validation confirms variables match their declared tier
+
+**Residual risk:** Low-entropy secrets may not trigger heuristic detection.
+
+### T2: XSS exfiltration of public variables (MEDIUM)
+
+An attacker achieves XSS and reads public config values.
+
+**Mitigations:** Largely out of scope — PUBLIC variables are by definition visible to browser code. REP helps indirectly by forcing classification (so truly sensitive values aren't in PUBLIC) and providing the SERVER tier for values that don't belong in the browser at all.
+
+### T3: XSS exfiltration of sensitive variables (MEDIUM-HIGH)
+
+An attacker achieves XSS and attempts to read encrypted SENSITIVE values.
+
+**Mitigations:**
+- Values are AES-256-GCM encrypted at rest in the HTML
+- Decryption requires fetching a session key from `/rep/session-key`
+- Session keys are single-use (prevents replay)
+- Session keys expire in 30 seconds
+- Endpoint is rate-limited (10 req/min per IP)
+- CORS validates the requesting origin
+- All key issuances are audit-logged
+
+**Residual risk:** A sophisticated same-origin XSS attack could fetch a session key and decrypt values. REP raises the bar from "read the DOM" to "make an authenticated, rate-limited, logged API call."
+
+### T4: MITM payload tampering (HIGH)
+
+An attacker modifies the injected `<script>` tag in transit.
+
+**Mitigations:**
+- HMAC-SHA256 integrity token computed over the canonical payload
+- SRI hash on the `data-rep-integrity` attribute
+- SDK sets `_tampered` flag if integrity check fails
+- `verify()` function exposes tamper state to the application
+
+**Limitation:** If the attacker can rewrite the entire script block (including the integrity attribute), verification cannot detect this. HTTPS is the primary defense against MITM.
+
+### T5: Environment variable leakage via gateway (CRITICAL)
+
+The gateway process itself is compromised, leaking SERVER-tier variables.
+
+**Mitigations:**
+- Strict prefix filtering — only `REP_*` variables are processed
+- No shell execution within the gateway
+- No filesystem writes
+- Minimal dependencies (zero external Go deps)
+- Compatible with read-only filesystems
+- Static binary, `FROM scratch` compatible
+- Non-root user execution (UID 65534)
+
+### T6: DoS via session key endpoint (LOW)
+
+An attacker floods `/rep/session-key` to exhaust resources.
+
+**Mitigations:** Rate limiting (10 req/min/IP), minimal computation per request, automatic key expiry cleanup, separate health port for monitoring.
+
+### T7: Supply chain attack on SDK (HIGH)
+
+The SDK package is compromised to exfiltrate variables.
+
+**Mitigations:** Minimal surface (&lt;2KB, ~150 lines), zero runtime dependencies, lockfile pinning, npm provenance, self-hostable (vendor the file).
+
+## Hardening recommendations
+
+### Production gateway configuration
+
+```bash
+REP_GATEWAY_STRICT=true              # Fail on guardrail warnings
+REP_GATEWAY_ALLOWED_ORIGINS=https://app.example.com
+REP_GATEWAY_LOG_FORMAT=json          # Structured logging for SIEM
+```
+
+### Minimal Docker image
+
+```dockerfile
+FROM scratch
+COPY rep-gateway /rep-gateway
+COPY dist/ /static/
+USER 65534:65534
+ENTRYPOINT ["/rep-gateway"]
+CMD ["--mode", "embedded", "--static-dir", "/static", "--strict"]
+```
+
+### Content Security Policy
+
+```
+Content-Security-Policy:
+  default-src 'self';
+  script-src 'self';
+  connect-src 'self';
+  style-src 'self' 'unsafe-inline';
+```
+
+The `<script id="__rep__" type="application/json">` tag is inert data — it does not execute. No `script-src` exception or nonce is needed for the REP payload.
+
+### Monitoring
+
+| Log Event | Level | Alert On |
+|---|---|---|
+| `rep.guardrail.warning` | WARN | Any occurrence in production |
+| `rep.session_key.issued` | INFO | Rate exceeding baseline |
+| `rep.session_key.rejected` | WARN | Any occurrence |
+| `rep.session_key.rate_limited` | WARN | Sustained bursts |
+| `rep.config.changed` | INFO | Unexpected changes |
+| `rep.inject.html` | DEBUG | N/A |
+
+## Known limitations
+
+1. **No client-side HMAC verification.** The HMAC secret never leaves the gateway. The SDK verifies via SRI hash only.
+2. **Sensitive tier is defense-in-depth, not absolute.** A determined attacker with XSS can eventually decrypt sensitive values.
+3. **No key rotation without restart.** Ephemeral keys are generated once at startup.
+4. **Guardrails are heuristic.** They catch common patterns but cannot detect all secrets.
+5. **Hot reload has an eventual consistency window.** Between config change and SSE delivery, clients see stale values.
+
+For the full formal analysis, see the [Security Model specification](/spec/security-model/).

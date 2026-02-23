@@ -1,0 +1,84 @@
+---
+title: REP-RFC-0001
+description: Core protocol specification — Runtime Environment Protocol v0.1.0.
+---
+
+import { Aside, LinkCard } from '@astrojs/starlight/components';
+
+```
+Title:    Runtime Environment Protocol (REP)
+Version:  0.1.0
+Status:   Active
+Authors:  Olamide Adebayo (Ruach Tech)
+Created:  2026-02-18
+License:  CC BY 4.0
+```
+
+<Aside>
+  This is the formal specification. For a practical introduction, see [How REP Works](/concepts/how-it-works/) and the [Quick Start](/quick-start/).
+</Aside>
+
+## Abstract
+
+This document specifies the **Runtime Environment Protocol (REP)**, a standardised method for injecting environment variables into browser-hosted applications at container startup rather than at build time. REP introduces a three-tier security classification system, cryptographic integrity verification, and an optional hot-reload mechanism.
+
+REP operates at the infrastructure layer. It requires no build-tool plugins, no framework-specific adapters, and no changes to the application's build process.
+
+## Sections
+
+The full specification covers 14 sections. Key topics are documented separately in the docs site:
+
+<LinkCard title="Variable Classification" href="/concepts/variable-classification/" description="§3 — Three-tier system, classification rules, guardrails" />
+<LinkCard title="How REP Works" href="/concepts/how-it-works/" description="§4 — Gateway architecture, startup sequence, HTML injection" />
+<LinkCard title="SDK API Reference" href="/reference/sdk/" description="§5 — Core API, initialization behavior, type generation" />
+<LinkCard title="Manifest File" href="/guides/manifest/" description="§6 — .rep.yaml schema, supported types, settings" />
+<LinkCard title="Gateway Flags" href="/reference/gateway-flags/" description="§7 — CLI flags and environment variable configuration" />
+<LinkCard title="Wire Format" href="/concepts/wire-format/" description="§8 — Payload JSON, encrypted blob, HMAC integrity" />
+<LinkCard title="Deployment Patterns" href="/deployment/docker-embedded/" description="§9 — Docker, Kubernetes, sidecar patterns" />
+<LinkCard title="Migration" href="/guides/migration/overview/" description="§10 — Incremental adoption, codemod tool" />
+<LinkCard title="Conformance" href="/spec/conformance/" description="§11 — Gateway and SDK conformance requirements" />
+
+## Design requirements
+
+| ID | Requirement |
+|---|---|
+| R1 | **Build-tool agnostic.** Must work with any frontend framework or bundler without build-time plugins. |
+| R2 | **Security-classified.** Must distinguish between public, sensitive, and server-only variables. |
+| R3 | **Integrity-verified.** The injected configuration must be verifiable by the client SDK. |
+| R4 | **Synchronously accessible.** Public variables must be available immediately on page load. |
+| R5 | **Zero application dependencies.** The client SDK must have zero runtime dependencies. |
+| R6 | **Minimal footprint.** Gateway under 5MB, SDK under 2KB gzipped. |
+| R7 | **Container-native.** Must integrate with Docker and Kubernetes via standard env vars. |
+| R8 | **Incrementally adoptable.** Must not require all-or-nothing migration. |
+| R9 | **Observable.** Must emit structured logs and metrics for injection events. |
+| R10 | **Hot-reloadable (optional).** Must support live config updates without page reload. |
+
+## Comparison with existing solutions
+
+| Feature | `envsubst` | `runtime-env-cra` | `@import-meta-env` | `react-env` | **REP** |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Framework agnostic | Yes | No | Partial | No | **Yes** |
+| No build tool plugin | Yes | No | No | No | **Yes** |
+| Security classification | -- | -- | -- | -- | **Yes** |
+| Encrypted sensitive vars | -- | -- | -- | -- | **Yes** |
+| Integrity verification | -- | -- | -- | -- | **Yes** |
+| Secret leak detection | -- | -- | -- | -- | **Yes** |
+| Hot reload | -- | -- | -- | -- | **Yes** |
+| No Node.js in prod | Partial | No | No | No | **Yes** |
+| Formal specification | -- | -- | -- | -- | **Yes** |
+| `FROM scratch` compatible | -- | -- | -- | -- | **Yes** |
+
+## FAQ
+
+**Q: Why not use a service mesh / API gateway?**
+Service meshes operate at L4/L7 for service-to-service communication. They don't inject configuration into HTML. REP is complementary.
+
+**Q: Why not use SSR frameworks that support runtime env vars?**
+SSR solves this for supported frameworks, but not all apps need SSR, it couples you to a specific framework, and many organisations have existing SPAs. REP works with any SPA.
+
+**Q: Isn't the SENSITIVE tier just security through obscurity?**
+Partially — see the [Security Model](/spec/security-model/) for an honest assessment. SENSITIVE raises the bar against casual exposure while making intentional access auditable. For true secrets, use the SERVER tier.
+
+---
+
+The full source of REP-RFC-0001 is available at [`spec/REP-RFC-0001.md`](https://github.com/ruachtech/rep/blob/main/spec/REP-RFC-0001.md).
