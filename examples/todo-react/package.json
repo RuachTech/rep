@@ -1,6 +1,6 @@
 {
-  "name": "@rep-protocol/example-todo-react",
-  "version": "0.1.0",
+  "name": "rep-example-todo-react",
+  "version": "0.1.4",
   "private": true,
   "description": "Example: Todo app showing REP gateway + React SDK integration",
   "scripts": {
@@ -14,8 +14,8 @@
     "rep:serve": "rep dev --port 3000 --env .env.local --static ./dist --hot-reload"
   },
   "dependencies": {
-    "@rep-protocol/react": "workspace:*",
-    "@rep-protocol/sdk": "workspace:*",
+    "@rep-protocol/react": "^0.1.4",
+    "@rep-protocol/sdk": "^0.1.4",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"
   },
@@ -23,7 +23,7 @@
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
-    "@rep-protocol/cli": "workspace:*",
+    "@rep-protocol/cli": "^0.1.4",
     "typescript": "^5.4.0",
     "vite": "^5.4.0"
   }

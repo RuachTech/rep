@@ -1,9 +1,9 @@
 # examples/todo-react/Dockerfile
 #
-# Builds a self-contained image: REP gateway binary + built React app.
-# Build context must be the REPO ROOT:
+# Standalone build — no monorepo required.
+# Build context is the example directory itself:
 #
-#   docker build -f examples/todo-react/Dockerfile -t rep-todo .
+#   docker build -t rep-todo .
 #
 # Run:
 #   docker run --rm -p 8080:8080 \
@@ -17,14 +17,13 @@
 # ── Stage 1: Download pre-built REP Gateway binary ────────────────────────────
 FROM alpine:3.21 AS gateway
 
-# Match the gatewayVersion field in cli/package.json.
-ARG GATEWAY_VERSION=0.1.2
+ARG GATEWAY_VERSION=0.1.3
 ARG TARGETARCH=amd64
 
 RUN apk add --no-cache curl ca-certificates && \
     ARCHIVE="rep-gateway_${GATEWAY_VERSION}_linux_${TARGETARCH}.tar.gz" && \
     curl -fsSL \
-      "https://github.com/RuachTech/rep/releases/download/v${GATEWAY_VERSION}/${ARCHIVE}" \
+      "https://github.com/RuachTech/rep/releases/download/gateway/v${GATEWAY_VERSION}/${ARCHIVE}" \
       -o /tmp/gateway.tar.gz && \
     tar -xzf /tmp/gateway.tar.gz -C /tmp && \
     mv /tmp/rep-gateway /rep-gateway && \
@@ -33,39 +32,15 @@ RUN apk add --no-cache curl ca-certificates && \
 # ── Stage 2: Build the React app ───────────────────────────────────────────────
 FROM node:20-alpine AS app
 
-RUN corepack enable && corepack prepare pnpm@9 --activate
+WORKDIR /app
 
-WORKDIR /repo
+# Copy package files and install dependencies from npm registry.
+COPY package.json package-lock.json* ./
+RUN npm install
 
-# Copy workspace descriptor and lockfile first (layer cache for pnpm install).
-COPY pnpm-workspace.yaml pnpm-lock.yaml ./
-
-# Copy every package.json in the workspace so pnpm can resolve the full graph.
-COPY sdk/package.json                    sdk/
-COPY cli/package.json                    cli/
-COPY cli/bin/rep.js                      cli/bin/
-COPY cli/scripts/postinstall.js          cli/scripts/
-COPY codemod/package.json                codemod/
-COPY adapters/react/package.json         adapters/react/
-COPY adapters/vue/package.json           adapters/vue/
-COPY adapters/svelte/package.json        adapters/svelte/
-COPY examples/todo-react/package.json   examples/todo-react/
-
-RUN pnpm install --frozen-lockfile
-
-# Copy source for the packages we actually need to build.
-COPY sdk/src/              sdk/src/
-COPY sdk/tsconfig.json     sdk/
-
-COPY adapters/react/src/         adapters/react/src/
-COPY adapters/react/tsconfig.json adapters/react/
-
-COPY examples/todo-react/   examples/todo-react/
-
-# Build: sdk → react adapter → app (in dependency order).
-RUN pnpm --filter @rep-protocol/sdk   run build && \
-    pnpm --filter @rep-protocol/react run build && \
-    pnpm --filter @rep-protocol/example-todo-react run build
+# Copy source and build.
+COPY . .
+RUN npm run build
 
 # ── Stage 3: Minimal runtime image (FROM scratch) ──────────────────────────────
 FROM scratch
@@ -74,7 +49,7 @@ FROM scratch
 COPY --from=gateway /rep-gateway /rep-gateway
 
 # Built static files.
-COPY --from=app /repo/examples/todo-react/dist /static
+COPY --from=app /app/dist /static
 
 # CA certificates for HTTPS upstream calls (if proxying).
 COPY --from=gateway /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/

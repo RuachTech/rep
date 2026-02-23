@@ -21,310 +21,77 @@ side with its tier (PUBLIC / SENSITIVE) and the raw payload metadata.
 
 ## Prerequisites
 
-- **Node.js** >= 20 and **pnpm** >= 9
-- **Go** >= 1.24.5 (to build the gateway binary) — _or_ **Docker** (skip Go)
+- **Node.js** >= 20
+- **Docker** (for container deployment) — _or_ the REP gateway binary (see below)
 
 ---
 
-## Option A — Local (no Docker)
+## Quick start
 
-### 1. Install workspace dependencies
+### 1. Install dependencies
 
 ```bash
-# From the repo root
-pnpm install
+npm install
 ```
 
-### 2. Build the SDK chain
-
-The example depends on `@rep-protocol/sdk` and `@rep-protocol/react`.
-Build them before building the app:
+### 2. Set up environment
 
 ```bash
-pnpm --filter @rep-protocol/sdk   run build
-pnpm --filter @rep-protocol/react run build
-```
-
-### 3. Build the CLI and gateway
-
-```bash
-# CLI — provides rep dev / validate / typegen / lint
-pnpm --filter @rep-protocol/cli run build
-
-# Gateway binary — the runtime the CLI wraps
-cd gateway && make build && cd ..
-# Output: gateway/bin/rep-gateway
-```
-
----
-
-### A0 — CLI-first workflow (recommended)
-
-`@rep-protocol/cli` is the intended DX layer. Instead of memorising gateway
-flags and manually prefixing every env var, you put values in `.env.local` and
-let the CLI handle the rest. The four commands map directly to the development
-lifecycle — and they're all wired as `pnpm` scripts in `package.json`.
-
-**Setup — copy the env file:**
-
-```bash
-# From examples/todo-react/
 cp .env.example .env.local
 # Edit .env.local with your values
 ```
 
----
+### 3. Development
 
-**1. `rep validate` — fail fast before touching the gateway**
+The `@rep-protocol/cli` package (installed as a dev dependency) provides the
+`rep` command for local development.
 
-```bash
-pnpm rep:validate
-# ✓ Manifest is valid
-#   Version: 0.1.0
-#   Variables: 5 total
-#     - PUBLIC: 4
-#     - SENSITIVE: 1
-#     - SERVER: 0
-```
-
-Checks every variable declared in `.rep.yaml` against the schema: required
-fields, type constraints (`url`, `enum`, `number`), and allowed enum values.
-Exits non-zero on failure — safe to run as a pre-start hook or CI gate.
-
----
-
-**2. `rep typegen` — typed `get()` and `getSecure()` overloads**
+**Proxy mode** — run alongside Vite's dev server:
 
 ```bash
-pnpm rep:typegen
-# ✓ Generated type definitions: src/rep.d.ts
-#   PUBLIC variables: 4
-#   SENSITIVE variables: 1
+# Terminal 1: start Vite
+npm run dev
+
+# Terminal 2: start the REP gateway (proxies Vite at localhost:5173)
+npx rep dev --port 3000 --env .env.local --proxy http://localhost:5173 --hot-reload
 ```
 
-Writes `src/rep.d.ts` with overloads keyed to your exact variable names:
-
-```ts
-// Generated — do not edit. Re-run `pnpm rep:typegen` after manifest changes.
-declare module "@rep-protocol/sdk" {
-  export function get(key: "APP_TITLE" | "ENV_NAME" | "API_URL" | "MAX_TODOS"): string | undefined;
-  export function getSecure(key: "ANALYTICS_KEY"): Promise<string>;
-}
-```
-
-After this, `useRep('TYPO')` is a **TypeScript compile error**. The manifest
-becomes the single source of truth for both the gateway and the type checker.
-Re-run whenever you add or rename a variable in `.rep.yaml`.
-
----
-
-**3. `rep dev` — replaces all the raw gateway commands**
-
-Instead of manually exporting `REP_PUBLIC_*` vars and passing gateway flags,
-point the CLI at `.env.local`:
+**Embedded mode** — serve a production build with hot reload:
 
 ```bash
-# Proxy mode — Vite dev server must be running separately at 5173
-pnpm rep:dev
-# Starting REP development server...
-# Loading environment from: .env.local
-# Loaded 5 variable(s)
-#
-# Configuration:
-#   Gateway binary: ../../gateway/bin/rep-gateway
-#   Mode: proxy  →  Upstream: http://localhost:5173
-#   Hot reload: disabled
-#
-# Gateway listening on :8080
+npm run build
+npx rep dev --port 3000 --env .env.local --static ./dist --hot-reload
 ```
 
+Or use the shortcut scripts in `package.json`:
+
 ```bash
-# Embedded mode — serves built dist/ with hot reload
-pnpm rep:serve
+npm run rep:dev     # proxy mode
+npm run rep:serve   # embedded mode (build first)
 ```
 
-The CLI passes `--env-file .env.local` to the gateway so it reads the file
-directly. With `--hot-reload`, the CLI also sets `--hot-reload-mode file_watch`
-and `--watch-path` automatically — edit `.env.local` and the gateway picks up
-changes live via SSE, no restart needed.
-
----
-
-**4. `rep lint` — catch secrets before they ship**
+### 4. CLI tools
 
 ```bash
-# Run after pnpm build
-pnpm rep:lint
-# Scanning directory: ./dist
-# Found 3 file(s) to scan
-#
-# ✓ No potential secrets detected
-```
+# Validate manifest
+npm run rep:validate
 
-Applies the same entropy and known-format detectors as the gateway guardrails
-to every `.js`/`.mjs` file in `dist/`. Catches `AKIA*` AWS keys, `sk_live_*`
-Stripe keys, `eyJ*` JWT tokens, high-entropy strings — anything that looks
-like it should have been injected via REP instead of baked into the bundle.
+# Generate TypeScript types from manifest
+npm run rep:typegen
 
-Add `--strict` to fail CI on any finding:
-
-```bash
-pnpm rep:lint -- --strict
+# Scan build output for leaked secrets
+npm run rep:lint
 ```
 
 ---
 
-> **A1 / A2 / A3 below show the raw gateway commands** — useful for
-> understanding what `rep dev` does under the hood, or if you prefer not to use
-> the CLI. Skip ahead to [Option B](#option-b--docker) if you're done.
+## Docker
 
-### A1 — Dev server (fastest iteration, active code changes)
-
-Run Vite's dev server and the gateway simultaneously. The gateway proxies
-Vite and injects the REP payload on every request, so you get live REP vars
-without a production build step.
-
-**Terminal 1** — Vite dev server:
-
-```bash
-pnpm --filter @rep-protocol/example-todo-react run dev
-# Vite starts at http://localhost:5173
-```
-
-**Terminal 2** — Gateway in proxy mode:
-
-```bash
-REP_PUBLIC_APP_TITLE="REP Todo" \
-REP_PUBLIC_ENV_NAME=development \
-REP_PUBLIC_API_URL=http://localhost:3001 \
-REP_PUBLIC_MAX_TODOS=5 \
-REP_SENSITIVE_ANALYTICS_KEY=ak_demo_abc123 \
-./gateway/bin/rep-gateway \
-  --mode proxy \
-  --upstream localhost:5173
-```
-
-| URL | What you get |
-|---|---|
-| `http://localhost:5173` | Vite direct — Vite HMR works, no REP vars injected |
-| `http://localhost:8080` | Gateway proxy — REP vars injected, Vite HMR not available |
-
-> **Why two ports?** Vite HMR uses WebSocket. The REP gateway's reverse proxy
-> does not upgrade WebSocket connections, so HMR only works when hitting Vite
-> directly. In practice: write code at 5173 (instant feedback), verify REP
-> integration at 8080.
-
----
-
-### A2 — Production build (full end-to-end, no live Vite)
-
-Build once, then run the gateway against the built `dist/`. Refresh the
-browser manually after each code change.
-
-**Build the app:**
-
-```bash
-pnpm --filter @rep-protocol/example-todo-react run build
-# Output: examples/todo-react/dist/
-```
-
-**Run the gateway:**
-
-```bash
-REP_PUBLIC_APP_TITLE="REP Todo" \
-REP_PUBLIC_ENV_NAME=development \
-REP_PUBLIC_API_URL=http://localhost:3001 \
-REP_PUBLIC_MAX_TODOS=5 \
-REP_SENSITIVE_ANALYTICS_KEY=ak_demo_abc123 \
-./gateway/bin/rep-gateway \
-  --mode embedded \
-  --static-dir examples/todo-react/dist
-```
-
-Open **http://localhost:8080**.
-
----
-
-### A3 — Config hot reload (no rebuild, no page reload)
-
-This is the core demonstration of REP: **change runtime config without
-touching the build artifact or reloading the page**.
-
-The gateway exposes a Server-Sent Events endpoint at `/rep/changes`. The SDK
-connects to it lazily when any `useRep()` hook mounts, and re-renders
-subscribed components when a change event arrives.
-
-#### Using the CLI (recommended)
-
-The `rep:dev` and `rep:serve` scripts already pass `--hot-reload`, which
-automatically sets up file watching on `.env.local`:
-
-```bash
-pnpm rep:serve
-```
-
-Open `http://localhost:8080`, then edit `.env.local` — for example, change
-`REP_PUBLIC_APP_TITLE=REP Todo` to `REP_PUBLIC_APP_TITLE=My Todos`. The
-gateway detects the file change, re-reads it, and pushes updates via SSE.
-The browser updates without a page reload.
-
-#### Using the gateway directly
-
-Use `--env-file` to point the gateway at a `.env` file, and `--hot-reload-mode
-file_watch` with `--watch-path` to watch it for changes:
-
-```bash
-./gateway/bin/rep-gateway \
-  --mode embedded \
-  --static-dir examples/todo-react/dist \
-  --env-file .env.local \
-  --hot-reload \
-  --hot-reload-mode file_watch \
-  --watch-path .env.local
-```
-
-Edit `.env.local` in your editor. The gateway detects the mtime change,
-re-reads the file, rebuilds the payload, and broadcasts diffs over SSE.
-Connected browser tabs re-render — **no page load, no restart**.
-
-#### Manual signal mode
-
-You can also trigger a reload manually with `SIGHUP` (useful for scripting):
-
-```bash
-# Start with signal mode (the default when --env-file is not watched)
-REP_PUBLIC_APP_TITLE="REP Todo" \
-REP_PUBLIC_ENV_NAME=development \
-REP_PUBLIC_API_URL=http://localhost:3001 \
-REP_PUBLIC_MAX_TODOS=5 \
-REP_SENSITIVE_ANALYTICS_KEY=ak_demo_abc123 \
-./gateway/bin/rep-gateway \
-  --mode embedded \
-  --static-dir examples/todo-react/dist \
-  --hot-reload
-
-# In another terminal:
-kill -HUP $(pgrep rep-gateway)
-```
-
-> **Production hot reload:** In Kubernetes or Docker Swarm, env vars can be
-> rotated in-flight via ConfigMaps or secrets. The gateway detects the change
-> (via `--hot-reload-mode poll` or `file_watch`) and pushes SSE events to all
-> open browser sessions simultaneously, with no restart or page reload. See
-> the spec (`REP-RFC-0001 §4.6`) for the full SSE wire format.
-
----
-
-## Option B — Docker
-
-Build context is the **repo root** (required for the pnpm workspace):
+Build context is the **example directory itself** (no monorepo required):
 
 ```bash
 # Build the image
-docker build \
-  -f examples/todo-react/Dockerfile \
-  -t rep-todo \
-  .
+docker build -t rep-todo .
 
 # Run with development config
 docker run --rm -p 8080:8080 \
@@ -352,6 +119,26 @@ docker run --rm -p 8080:8080 \
 
 ---
 
+## Config hot reload
+
+The core demonstration of REP: **change runtime config without touching the
+build artifact or reloading the page**.
+
+The gateway exposes a Server-Sent Events endpoint at `/rep/changes`. The SDK
+connects to it lazily when any `useRep()` hook mounts, and re-renders
+subscribed components when a change event arrives.
+
+```bash
+npm run rep:serve
+```
+
+Open `http://localhost:8080`, then edit `.env.local` — for example, change
+`REP_PUBLIC_APP_TITLE=REP Todo` to `REP_PUBLIC_APP_TITLE=My Todos`. The
+gateway detects the file change, re-reads it, and pushes updates via SSE.
+The browser updates without a page reload.
+
+---
+
 ## Environment variables
 
 | Variable | Tier | Type | Default | Description |
@@ -361,14 +148,6 @@ docker run --rm -p 8080:8080 \
 | `REP_PUBLIC_API_URL` | PUBLIC | url | _(required)_ | Backend API base URL |
 | `REP_PUBLIC_MAX_TODOS` | PUBLIC | number | `10` | Max todos before the add form locks |
 | `REP_SENSITIVE_ANALYTICS_KEY` | SENSITIVE | string | — | Analytics write key — AES-256-GCM encrypted in page source |
-
-Gateway configuration (not injected into the app):
-
-| Variable | Default | Description |
-|---|---|---|
-| `REP_GATEWAY_PORT` | `8080` | Port the gateway listens on |
-| `REP_GATEWAY_MODE` | `embedded` | `embedded` (serve static files) or `proxy` (reverse proxy) |
-| `REP_GATEWAY_LOG_FORMAT` | `text` | `text` or `json` |
 
 ---
 
@@ -398,28 +177,16 @@ variables differ between deployments — exactly like any other twelve-factor ap
 
 ---
 
-## CLI scripts (package.json)
-
-| Script | Command | Description |
-|---|---|---|
-| `pnpm rep:validate` | `rep validate --manifest .rep.yaml` | Validate manifest schema and constraints |
-| `pnpm rep:typegen` | `rep typegen --manifest .rep.yaml --output src/rep.d.ts` | Generate typed SDK overloads |
-| `pnpm rep:dev` | `rep dev --env .env.local --proxy http://localhost:5173 --hot-reload` | Dev server (proxy mode, file watching) |
-| `pnpm rep:serve` | `rep dev --env .env.local --static ./dist --hot-reload` | Dev server (embedded, file watching) |
-| `pnpm rep:lint` | `rep lint --dir ./dist` | Scan build output for leaked secrets |
-
----
-
 ## Project structure
 
 ```
-examples/todo-react/
+todo-react/
 ├── .rep.yaml                  # REP manifest — source of truth for variables + types
 ├── .env.example               # Copy to .env.local; read by rep dev
 ├── .env.local                 # Your local values (gitignored)
 ├── Dockerfile                 # Multi-stage build (gateway + React, FROM scratch)
 ├── README.md
-├── package.json               # Scripts: rep:validate, rep:typegen, rep:dev, rep:serve, rep:lint
+├── package.json
 ├── tsconfig.json
 ├── vite.config.ts
 ├── index.html                 # <head> tag required for gateway injection
