@@ -142,4 +142,10 @@ Use `rep lint` in CI to catch accidentally leaked secrets in build output:
 rep lint --dir ./dist --strict
 ```
 
-This runs the same entropy and pattern detection as the gateway guardrails, but against your compiled JavaScript bundles. Add it as a CI step to prevent deployment of bundles containing secrets.
+This runs the same entropy and pattern detection as the gateway guardrails, but against your compiled JavaScript bundles. Minified code patterns are automatically filtered to avoid false positives, while real secrets in bundles are still detected. Use `--exclude` to skip specific files:
+
+```bash
+rep lint --dir ./dist --strict --exclude "vendor/**,*.chunk.js"
+```
+
+Add it as a CI step to prevent deployment of bundles containing secrets. See the [CLI reference](/reference/cli/#rep-lint) for full details on minified file handling.
