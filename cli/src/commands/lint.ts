@@ -17,11 +17,15 @@ export function createLintCommand(): Command {
     .description('Scan built JS bundles for accidentally leaked secrets')
     .option('-d, --dir <path>', 'Directory to scan (e.g., ./dist)', './dist')
     .option('--pattern <glob>', 'File pattern to scan', '**/*.{js,mjs,cjs}')
+    .option('--exclude <patterns>', 'Comma-separated glob patterns to exclude (e.g., "*.min.js,vendor/**")')
     .option('--strict', 'Exit with error code if warnings are found', false)
     .action(async (options) => {
       const dir = options.dir;
       const pattern = options.pattern;
       const strict = options.strict;
+      const excludePatterns = options.exclude
+        ? options.exclude.split(',').map((p: string) => p.trim())
+        : [];
       
       try {
         console.log(chalk.blue(`Scanning directory: ${dir}`));
@@ -36,6 +40,7 @@ export function createLintCommand(): Command {
           cwd: dir,
           absolute: true,
           nodir: true,
+          ignore: excludePatterns,
         });
         
         if (files.length === 0) {
