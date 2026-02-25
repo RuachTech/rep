@@ -11,8 +11,7 @@ on:
       - 'CONTRIBUTING.md'
       - '.github/workflows/docs.yml'
   pull_request:
-    paths:
-      - 'docs/**'
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -20,8 +19,30 @@ permissions:
   deployments: write
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ github.event_name != 'pull_request' || steps.filter.outputs.docs == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.event_name == 'pull_request'
+        with:
+          filters: |
+            docs:
+              - 'docs/**'
+              - 'spec/**'
+              - 'schema/**'
+              - 'README.md'
+              - 'CONTRIBUTING.md'
+              - '.github/workflows/docs.yml'
+
   build-and-deploy:
     name: Build and Deploy Docs
+    needs: changes
+    if: needs.changes.outputs.should_run == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -60,3 +81,17 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy docs/dist --project-name=rep-docs --branch=${{ github.head_ref }}
+
+  docs-status:
+    name: Docs Status
+    if: always()
+    needs: [build-and-deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check result
+        run: |
+          if [ "${{ needs.build-and-deploy.result }}" = "failure" ] || [ "${{ needs.build-and-deploy.result }}" = "cancelled" ]; then
+            echo "Docs CI failed or was cancelled"
+            exit 1
+          fi
+          echo "Docs CI passed or was skipped"
