@@ -76,7 +76,7 @@ rep lint [--dir <path>] [--pattern <glob>] [--exclude <patterns>] [--strict]
 
 The linter filters out false positives from minified/bundled code while still detecting real secrets embedded in your bundles.
 
-**File-level skip:** Files with `.min.js` / `.min.mjs` / `.min.cjs` extensions are skipped entirely — these are third-party vendor bundles that don't contain your application code.
+**File-level skip:** Files with `.min.js` / `.min.mjs` / `.min.cjs` extensions are skipped entirely, as these are typically third-party vendor bundles. If your build pipeline produces application code with `.min.js` filenames, rename the output or run `rep lint` against the non-minified build.
 
 **String-level filtering:** For all other files (including Vite, webpack, and Rollup bundles), extracted string values are checked for JavaScript language constructs (`function`, `return`, `if`, `=>`, `===`, `&&`, `.method()`, `key:value`, etc.) and skipped if they look like compiled code. This means real secrets accidentally embedded in a bundle are still detected, while minified code noise is filtered out.
 

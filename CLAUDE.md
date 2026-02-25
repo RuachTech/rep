@@ -30,8 +30,9 @@ REP introduces:
 ```
 rep/
 ├── .github/workflows/
-│   ├── gateway.yml                    # Go CI (vet, test, build)
-│   ├── sdk.yml                        # TypeScript packages CI
+│   ├── gateway.yml                    # Go CI (vet, test, build) — path-filtered with status gate
+│   ├── sdk.yml                        # TypeScript packages CI — path-filtered with status gate
+│   ├── docs.yml                       # Docs build + Cloudflare deploy — path-filtered with status gate
 │   └── release-sdk.yml                # Release workflow (npm + GoReleaser + Docker)
 │
 ├── package.json                       # Monorepo root (pnpm 9.0.0, private)
@@ -242,6 +243,7 @@ Full threat analysis in `spec/SECURITY-MODEL.md`.
 | **`postinstall.js` downloads from GitHub Releases** | Replaces the previous approach of building from source (monorepo) or printing instructions. Fetches the correct platform archive via native Node.js `https` module (`agent: false` to avoid 30s keep-alive hang). Falls back to local monorepo binary if present. |
 | **GoReleaser temp tag in CI** | `monorepo.tag_prefix` is GoReleaser Pro-only. Free-tier workaround: `git tag v0.1.x` (temp, never pushed) in CI before GoReleaser runs so its git validation passes. `GORELEASER_CURRENT_TAG=gateway/v0.1.x` points to the real remote tag. |
 | **`changelog.use: git`** | Avoids GitHub API 404 that occurs when the bare `vX.Y.Z` tag only exists locally in CI. The `git` changelog reads local git log directly. |
+| **CI path-filter gate pattern** | Monorepo workflows use `dorny/paths-filter` to detect changes, with a `*-status` gate job (`if: always()`) that reports success when CI passes or is skipped. This solves GitHub branch protection requiring all status checks — without path filters, workflows wouldn't run and checks would pend forever. Required checks: `Gateway Status`, `SDK Status`, `Docs Status`. |
 
 ---
 

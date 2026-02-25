@@ -104,12 +104,17 @@ export function scanValue(value: string): GuardrailWarning[] {
 
 /**
  * Detect whether a file should be skipped entirely.
- * Only explicit `.min.js` files are skipped — these are third-party
- * vendor bundles that never contain your application secrets.
+ * Only explicit `.min.js` files are skipped — these are conventionally
+ * third-party vendor bundles (e.g., react.min.js, lodash.min.js).
  *
- * Application bundles (Vite, webpack, etc.) are NOT skipped at the file
- * level, because real secrets could be accidentally embedded in them.
- * Instead, individual extracted strings are filtered by looksLikeCode().
+ * Modern bundlers (Vite, webpack, Rollup, esbuild) do NOT produce
+ * `.min.js` filenames by default — they use hashed names like
+ * `index-BlqUhaVx.js`. Application bundles are always scanned at the
+ * string level via looksLikeCode() to catch embedded secrets.
+ *
+ * If a project's build pipeline produces application code as `.min.js`,
+ * the recommendation is to rename the output or lint the non-minified
+ * build instead.
  */
 function shouldSkipFile(filename: string): boolean {
   return /\.min\.[cm]?js$/.test(filename);

@@ -81,7 +81,7 @@ rep lint --dir ./dist
 
 The linter filters out false positives from minified/bundled code while still detecting real secrets embedded in your bundles.
 
-- **File-level skip:** `.min.js` / `.min.mjs` / `.min.cjs` files are skipped entirely (third-party vendor bundles).
+- **File-level skip:** `.min.js` / `.min.mjs` / `.min.cjs` files are skipped entirely, as these are typically third-party vendor bundles. If your build produces application code with `.min.js` filenames, rename the output or run lint against the non-minified build.
 - **String-level filtering:** For all other files (including Vite, webpack, and Rollup bundles), extracted string values containing JavaScript language constructs (`function`, `return`, `if`, `=>`, `===`, `&&`, `.method()`, `key:value`, etc.) are recognised as compiled code and skipped. Real secrets embedded in bundles are still detected.
 
 Use `--exclude` to skip additional files or directories:
