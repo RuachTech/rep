@@ -21,14 +21,14 @@ permissions:
 jobs:
   changes:
     name: Detect changes
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     outputs:
-      should_run: ${{ github.event_name != 'pull_request' || steps.filter.outputs.docs == 'true' }}
+      should_run: ${{ steps.filter.outputs.docs }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
         id: filter
-        if: github.event_name == 'pull_request'
         with:
           filters: |
             docs:
@@ -42,7 +42,10 @@ jobs:
   build-and-deploy:
     name: Build and Deploy Docs
     needs: changes
-    if: needs.changes.outputs.should_run == 'true'
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      needs.changes.outputs.should_run == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -84,7 +87,7 @@ jobs:
 
   docs-status:
     name: Docs Status
-    if: always()
+    if: always() && github.event_name == 'pull_request'
     needs: [build-and-deploy]
     runs-on: ubuntu-latest
     steps:

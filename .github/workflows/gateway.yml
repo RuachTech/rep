@@ -12,6 +12,7 @@ on:
 jobs:
   changes:
     name: Detect changes
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     outputs:
       should_run: ${{ steps.filter.outputs.gateway }}
@@ -28,7 +29,9 @@ jobs:
   ci:
     name: Vet · Test · Build
     needs: changes
-    if: needs.changes.outputs.should_run == 'true'
+    if: |
+      github.event_name == 'push' ||
+      needs.changes.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -53,7 +56,7 @@ jobs:
 
   gateway-status:
     name: Gateway Status
-    if: always()
+    if: always() && github.event_name == 'pull_request'
     needs: [ci]
     runs-on: ubuntu-latest
     steps:

@@ -16,6 +16,7 @@ on:
 jobs:
   changes:
     name: Detect changes
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     outputs:
       should_run: ${{ steps.filter.outputs.sdk }}
@@ -36,7 +37,9 @@ jobs:
   ci:
     name: Install · Build · Test
     needs: changes
-    if: needs.changes.outputs.should_run == 'true'
+    if: |
+      github.event_name == 'push' ||
+      needs.changes.outputs.should_run == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -60,7 +63,7 @@ jobs:
 
   sdk-status:
     name: SDK Status
-    if: always()
+    if: always() && github.event_name == 'pull_request'
     needs: [ci]
     runs-on: ubuntu-latest
     steps:
