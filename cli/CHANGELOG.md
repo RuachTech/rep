@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/RuachTech/rep/compare/cli-v0.1.4...cli-v0.1.5) (2026-02-25)
+
+
+### Bug Fixes
+
+* **cli,docs:** resolved false alarm on high entropy values during listing  ([#14](https://github.com/RuachTech/rep/issues/14)) ([f629b95](https://github.com/RuachTech/rep/commit/f629b957b96346d538d513690bdc631855885784))
+
 ## [0.1.4](https://github.com/RuachTech/rep/compare/cli-v0.1.3...cli-v0.1.4) (2026-02-22)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "@rep-protocol/svelte",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Svelte adapter for the Runtime Environment Protocol (REP).",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
