@@ -16,6 +16,12 @@ on:
         type: boolean
         default: false
 
+# Prevent concurrent release runs racing each other.
+# cancel-in-progress: false ensures an in-flight release always completes.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
   contents: write
   pull-requests: write
@@ -23,9 +29,84 @@ permissions:
   packages: write  # push to GHCR
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # recover-stale-releases
+  #
+  # Runs before release-please on every push. Idempotently creates any git tags
+  # that the manifest says should exist but don't (e.g. when the tagging step
+  # failed on a previous run), and relabels merged release PRs that are still
+  # carrying the 'autorelease: pending' label. This permanently prevents the
+  # "untagged merged release PRs outstanding - aborting" failure that occurs
+  # whenever the tagging step doesn't complete.
+  # ---------------------------------------------------------------------------
+  recover-stale-releases:
+    name: Recover Stale Releases
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create missing manifest tags and relabel stale PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          git fetch --tags --quiet
+
+          # Map: package path → tag prefix (must match include-component-in-tag convention)
+          declare -A TAG_PREFIX=(
+            ["sdk"]="sdk-v"
+            ["cli"]="cli-v"
+            ["codemod"]="codemod-v"
+            ["adapters/react"]="react-v"
+            ["adapters/vue"]="vue-v"
+            ["adapters/svelte"]="svelte-v"
+          )
+
+          TAGGED=0
+
+          for pkg_path in "sdk" "cli" "codemod" "adapters/react" "adapters/vue" "adapters/svelte"; do
+            manifest_ver=$(jq -r --arg p "$pkg_path" '.[$p]' .release-please-manifest.json)
+            pkg_ver=$(jq -r '.version' "${pkg_path}/package.json")
+            prefix="${TAG_PREFIX[$pkg_path]}"
+            tag="${prefix}${manifest_ver}"
+
+            # Only create the tag when both sources agree on the version (meaning
+            # the release PR was merged) and the tag doesn't already exist.
+            if [[ "$manifest_ver" == "$pkg_ver" ]] && ! git rev-parse "$tag" >/dev/null 2>&1; then
+              commit=$(git log --format="%H" -1 -- "${pkg_path}/package.json")
+              echo "::notice::Creating missing tag $tag at $commit"
+              git tag "$tag" "$commit"
+              git push origin "$tag"
+              TAGGED=1
+            fi
+          done
+
+          # If we just created tags, find any merged release PRs that are still
+          # labeled 'autorelease: pending' and flip them to 'autorelease: tagged'
+          # so that release-please no longer considers them untagged.
+          if [[ "$TAGGED" -eq 1 ]]; then
+            gh pr list \
+              --label "autorelease: pending" \
+              --state merged \
+              --json number \
+              --jq '.[].number' \
+            | while read -r pr_number; do
+                echo "::notice::Relabeling PR #${pr_number}: autorelease: pending → autorelease: tagged"
+                gh pr edit "$pr_number" \
+                  --remove-label "autorelease: pending" \
+                  --add-label "autorelease: tagged"
+              done
+          fi
+
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
+    needs: recover-stale-releases
+    if: always()  # run even if recover-stale-releases was skipped (workflow_dispatch)
     outputs:
       releases_created: ${{ steps.resolve.outputs.releases_created }}
       paths_released: ${{ steps.resolve.outputs.paths_released }}
