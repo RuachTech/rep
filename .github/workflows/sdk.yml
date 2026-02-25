@@ -11,17 +11,32 @@ on:
       - 'pnpm-workspace.yaml'
       - '.github/workflows/sdk.yml'
   pull_request:
-    paths:
-      - 'sdk/**'
-      - 'cli/**'
-      - 'codemod/**'
-      - 'adapters/**'
-      - 'pnpm-workspace.yaml'
-      - '.github/workflows/sdk.yml'
+    branches: [main]
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.filter.outputs.sdk }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            sdk:
+              - 'sdk/**'
+              - 'cli/**'
+              - 'codemod/**'
+              - 'adapters/**'
+              - 'pnpm-workspace.yaml'
+              - '.github/workflows/sdk.yml'
+
   ci:
     name: Install · Build · Test
+    needs: changes
+    if: needs.changes.outputs.should_run == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -42,3 +57,17 @@ jobs:
 
       - name: Test all packages
         run: pnpm -r --if-present run test
+
+  sdk-status:
+    name: SDK Status
+    if: always()
+    needs: [ci]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check result
+        run: |
+          if [ "${{ needs.ci.result }}" = "failure" ] || [ "${{ needs.ci.result }}" = "cancelled" ]; then
+            echo "SDK CI failed or was cancelled"
+            exit 1
+          fi
+          echo "SDK CI passed or was skipped"

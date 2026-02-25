@@ -62,14 +62,25 @@ declare module "@rep-protocol/sdk" {
 Scan built JavaScript bundles for accidentally leaked secrets. Uses the same guardrail detection as the gateway (Shannon entropy, known secret formats).
 
 ```bash
-rep lint [--dir <path>] [--pattern <glob>] [--strict]
+rep lint [--dir <path>] [--pattern <glob>] [--exclude <patterns>] [--strict]
 ```
 
 | Flag | Default | Description |
 |---|---|---|
 | `-d, --dir <path>` | `./dist` | Directory to scan |
 | `--pattern <glob>` | `**/*.{js,mjs,cjs}` | File pattern to scan |
+| `--exclude <patterns>` | — | Comma-separated glob patterns to exclude (e.g., `"*.min.js,vendor/**"`) |
 | `--strict` | `false` | Exit with error code if warnings found |
+
+### Minified code handling
+
+The linter filters out false positives from minified/bundled code while still detecting real secrets embedded in your bundles.
+
+**File-level skip:** Files with `.min.js` / `.min.mjs` / `.min.cjs` extensions are skipped entirely, as these are typically third-party vendor bundles. If your build pipeline produces application code with `.min.js` filenames, rename the output or run `rep lint` against the non-minified build.
+
+**String-level filtering:** For all other files (including Vite, webpack, and Rollup bundles), extracted string values are checked for JavaScript language constructs (`function`, `return`, `if`, `=>`, `===`, `&&`, `.method()`, `key:value`, etc.) and skipped if they look like compiled code. This means real secrets accidentally embedded in a bundle are still detected, while minified code noise is filtered out.
+
+If you still get false positives, use `--exclude` to skip specific files or directories.
 
 **Example:**
 ```bash
@@ -79,6 +90,11 @@ $ rep lint --dir ./dist
     const key = "sk_live_abc123..."
 
 ⚠ Found 1 potential secret(s) in 1 file(s)
+```
+
+```bash
+# Exclude vendor bundles
+$ rep lint --dir ./dist --exclude "vendor/**,*.chunk.js"
 ```
 
 **Use cases:**

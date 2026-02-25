@@ -118,6 +118,13 @@ Scan built bundles for accidentally leaked secrets:
         run: npx @rep-protocol/cli lint --dir ./dist --strict
 ```
 
+Minified code patterns are automatically filtered to avoid false positives, while real secrets in bundles are still detected. Use `--exclude` to skip specific files:
+
+```yaml
+      - name: Scan for secrets
+        run: npx @rep-protocol/cli lint --dir ./dist --strict --exclude "vendor/**"
+```
+
 <Aside type="tip">
   Combine `rep validate` and `rep lint` as required CI checks. Validation catches schema issues at commit time; lint catches leaked secrets at build time.
 </Aside>

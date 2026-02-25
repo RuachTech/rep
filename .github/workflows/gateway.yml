@@ -7,13 +7,28 @@ on:
       - 'gateway/**'
       - '.github/workflows/gateway.yml'
   pull_request:
-    paths:
-      - 'gateway/**'
-      - '.github/workflows/gateway.yml'
+    branches: [main]
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.filter.outputs.gateway }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            gateway:
+              - 'gateway/**'
+              - '.github/workflows/gateway.yml'
+
   ci:
     name: Vet · Test · Build
+    needs: changes
+    if: needs.changes.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -35,3 +50,17 @@ jobs:
 
       - name: Build
         run: CGO_ENABLED=0 go build -trimpath ./cmd/rep-gateway
+
+  gateway-status:
+    name: Gateway Status
+    if: always()
+    needs: [ci]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check result
+        run: |
+          if [ "${{ needs.ci.result }}" = "failure" ] || [ "${{ needs.ci.result }}" = "cancelled" ]; then
+            echo "Gateway CI failed or was cancelled"
+            exit 1
+          fi
+          echo "Gateway CI passed or was skipped"

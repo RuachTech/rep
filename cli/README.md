@@ -74,7 +74,21 @@ rep lint --dir ./dist
 **Options:**
 - `-d, --dir <path>` - Directory to scan (default: `./dist`)
 - `--pattern <glob>` - File pattern to scan (default: `**/*.{js,mjs,cjs}`)
+- `--exclude <patterns>` - Comma-separated glob patterns to exclude (e.g., `"*.min.js,vendor/**"`)
 - `--strict` - Exit with error code if warnings are found
+
+**Minified code handling:**
+
+The linter filters out false positives from minified/bundled code while still detecting real secrets embedded in your bundles.
+
+- **File-level skip:** `.min.js` / `.min.mjs` / `.min.cjs` files are skipped entirely, as these are typically third-party vendor bundles. If your build produces application code with `.min.js` filenames, rename the output or run lint against the non-minified build.
+- **String-level filtering:** For all other files (including Vite, webpack, and Rollup bundles), extracted string values containing JavaScript language constructs (`function`, `return`, `if`, `=>`, `===`, `&&`, `.method()`, `key:value`, etc.) are recognised as compiled code and skipped. Real secrets embedded in bundles are still detected.
+
+Use `--exclude` to skip additional files or directories:
+
+```bash
+rep lint --dir ./dist --exclude "vendor/**,*.chunk.js"
+```
 
 **Use cases:**
 - CI/CD pipeline step to catch secrets before deployment
@@ -86,7 +100,7 @@ rep lint --dir ./dist
 ⚠ dist/main.js
   high_entropy:42: value has high entropy (5.23 bits/char) — may be a secret
     const key = "sk_live_abc123..."
-  
+
 ⚠ Found 1 potential secret(s) in 1 file(s)
 ```
 

@@ -103,16 +103,65 @@ export function scanValue(value: string): GuardrailWarning[] {
 }
 
 /**
+ * Detect whether a file should be skipped entirely.
+ * Only explicit `.min.js` files are skipped — these are conventionally
+ * third-party vendor bundles (e.g., react.min.js, lodash.min.js).
+ *
+ * Modern bundlers (Vite, webpack, Rollup, esbuild) do NOT produce
+ * `.min.js` filenames by default — they use hashed names like
+ * `index-BlqUhaVx.js`. Application bundles are always scanned at the
+ * string level via looksLikeCode() to catch embedded secrets.
+ *
+ * If a project's build pipeline produces application code as `.min.js`,
+ * the recommendation is to rename the output or lint the non-minified
+ * build instead.
+ */
+function shouldSkipFile(filename: string): boolean {
+  return /\.min\.[cm]?js$/.test(filename);
+}
+
+/**
+ * Heuristic to detect whether a string extracted from a bundle looks like
+ * compiled/minified code rather than a secret value. Minified JS naturally
+ * has high entropy and long runs without spaces, but it also contains
+ * language constructs that real secrets never do.
+ *
+ * Patterns detected:
+ * - JS keywords: function, return, if, var, const, throw, void, etc.
+ * - Operators: ===, !==, =>, ||, &&
+ * - Method calls: .something(
+ * - Object literals: key:value patterns (e.g., {onClick:, style:{)
+ * - Control flow: catch(, try{
+ * - Multiple semicolons (statement separators)
+ * - Multiple curly braces (block/object delimiters)
+ */
+const CODE_PATTERN = /\b(function|return|if|else|var|let|const|throw|new|typeof|instanceof|this|null|undefined|true|false|void|for|while|switch|case|break|continue|class|extends|import|export|require|module|window|document)\b|[=!]==?|=>|\|\||&&|\.\w+\(|catch\s*\(|try\s*\{|\w+:\w+[.,})]|[{][^}]*:[^{]*[}]|;.*;/;
+
+function looksLikeCode(value: string): boolean {
+  return CODE_PATTERN.test(value);
+}
+
+/**
  * Scan file content for potential secrets.
  * Returns warnings with line context.
+ *
+ * Note: scanValue() is ported from the gateway (Go) and kept in sync.
+ * This function is CLI-specific — it handles bundle file parsing and
+ * applies heuristics (minified file detection, code-string filtering)
+ * that are irrelevant to the gateway's env-var-only scanning context.
  */
 export function scanFileContent(content: string, filename: string): Array<GuardrailWarning & { line?: number; filename: string }> {
   const warnings: Array<GuardrailWarning & { line?: number; filename: string }> = [];
+
+  if (shouldSkipFile(filename)) {
+    return warnings;
+  }
+
   const lines = content.split('\n');
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    
+
     // Skip comments and very short lines
     if (line.trim().startsWith('//') || line.trim().startsWith('#') || line.trim().length < 16) {
       continue;
@@ -120,11 +169,17 @@ export function scanFileContent(content: string, filename: string): Array<Guardr
 
     // Look for string literals that might contain secrets
     const stringMatches = line.matchAll(/["'`]([^"'`]{16,})["'`]/g);
-    
+
     for (const match of stringMatches) {
       const value = match[1];
+
+      // Skip extracted strings that are clearly minified/compiled code
+      if (looksLikeCode(value)) {
+        continue;
+      }
+
       const valueWarnings = scanValue(value);
-      
+
       for (const warning of valueWarnings) {
         warnings.push({
           ...warning,
