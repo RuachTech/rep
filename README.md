@@ -4,7 +4,7 @@
 
 REP is an open protocol for injecting environment variables into browser apps **at container runtime** — not build time. It gives you security classification, encryption, integrity verification, and hot reload, with zero build-tool coupling.
 
-[Documentation](https://rep-protocol.dev) | [Demo Video](https://github.com/RuachTech/rep/releases/download/v0.1.3/rep-gateway-demo.mp4)
+[Documentation](https://rep-protocol.dev)
 
 ## Quick Start
 
