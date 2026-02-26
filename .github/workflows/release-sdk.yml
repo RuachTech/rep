@@ -42,13 +42,17 @@ jobs:
   recover-stale-releases:
     name: Recover Stale Releases
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    # Runs on every trigger but steps are conditioned on push events.
+    # This ensures the job always succeeds (never "skipped"), so downstream
+    # jobs can depend on it without if: always() — which breaks output propagation.
     steps:
       - uses: actions/checkout@v4
+        if: github.event_name == 'push'
         with:
           fetch-depth: 0
 
       - name: Create missing manifest tags and relabel stale PRs
+        if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -106,7 +110,7 @@ jobs:
     name: Release Please
     runs-on: ubuntu-latest
     needs: recover-stale-releases
-    if: always()  # run even if recover-stale-releases was skipped (workflow_dispatch)
+    if: ${{ !cancelled() }}
     outputs:
       releases_created: ${{ steps.resolve.outputs.releases_created }}
       paths_released: ${{ steps.resolve.outputs.paths_released }}
@@ -148,22 +152,37 @@ jobs:
       - name: Resolve outputs
         id: resolve
         run: |
+          set -euo pipefail
+
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             GATEWAY_TAG="${{ inputs.gateway_tag }}"
-            GATEWAY_RELEASE_CREATED=$([[ -n "$GATEWAY_TAG" ]] && echo "true" || echo "")
-            NPM_PUBLISH=$([[ "${{ inputs.republish_npm }}" == "true" ]] && echo "true" || echo "")
-            RELEASES_CREATED=$([[ -n "$GATEWAY_RELEASE_CREATED" || -n "$NPM_PUBLISH" ]] && echo "true" || echo "")
-            echo "releases_created=${RELEASES_CREATED}" >> "$GITHUB_OUTPUT"
-            echo "paths_released=" >> "$GITHUB_OUTPUT"
-            echo "gateway_release_created=${GATEWAY_RELEASE_CREATED}" >> "$GITHUB_OUTPUT"
-            echo "gateway_tag_name=${GATEWAY_TAG}" >> "$GITHUB_OUTPUT"
-            echo "npm_publish=${NPM_PUBLISH}" >> "$GITHUB_OUTPUT"
+            if [[ -n "$GATEWAY_TAG" ]]; then GATEWAY_RELEASE_CREATED="true"; else GATEWAY_RELEASE_CREATED=""; fi
+            if [[ "${{ inputs.republish_npm }}" == "true" ]]; then NPM_PUBLISH="true"; else NPM_PUBLISH=""; fi
+            if [[ -n "$GATEWAY_RELEASE_CREATED" || -n "$NPM_PUBLISH" ]]; then RELEASES_CREATED="true"; else RELEASES_CREATED=""; fi
+
+            {
+              echo "releases_created=${RELEASES_CREATED}"
+              echo "paths_released="
+              echo "gateway_release_created=${GATEWAY_RELEASE_CREATED}"
+              echo "gateway_tag_name=${GATEWAY_TAG}"
+              echo "npm_publish=${NPM_PUBLISH}"
+            } >> "$GITHUB_OUTPUT"
+
+            echo "::notice::workflow_dispatch — npm_publish=${NPM_PUBLISH}, gateway_release_created=${GATEWAY_RELEASE_CREATED}, gateway_tag=${GATEWAY_TAG}"
           else
-            echo "releases_created=${{ steps.release.outputs.releases_created }}" >> "$GITHUB_OUTPUT"
-            echo "paths_released=${{ steps.release.outputs.paths_released }}" >> "$GITHUB_OUTPUT"
-            echo "gateway_release_created=${{ steps.release.outputs['gateway--release_created'] }}" >> "$GITHUB_OUTPUT"
-            echo "gateway_tag_name=${{ steps.release.outputs['gateway--tag_name'] }}" >> "$GITHUB_OUTPUT"
-            echo "npm_publish=${{ steps.release.outputs.releases_created }}" >> "$GITHUB_OUTPUT"
+            # All npm packages use linked-versions, so sdk is representative.
+            # No fallback to releases_created — that includes gateway-only releases.
+            NPM_PUBLISH="${{ steps.release.outputs['sdk--release_created'] }}"
+
+            {
+              echo "releases_created=${{ steps.release.outputs.releases_created }}"
+              echo "paths_released=${{ steps.release.outputs.paths_released }}"
+              echo "gateway_release_created=${{ steps.release.outputs['gateway--release_created'] }}"
+              echo "gateway_tag_name=${{ steps.release.outputs['gateway--tag_name'] }}"
+              echo "npm_publish=${NPM_PUBLISH}"
+            } >> "$GITHUB_OUTPUT"
+
+            echo "::notice::push — releases_created=${{ steps.release.outputs.releases_created }}, npm_publish=${NPM_PUBLISH}, gateway=${{ steps.release.outputs['gateway--release_created'] }}"
           fi
 
   publish-npm:
@@ -197,7 +216,7 @@ jobs:
         run: |
           V=$(node -p "require('./package.json').version")
           PUBLISHED=$(npm view @rep-protocol/sdk@${V} version 2>/dev/null || true)
-          if [ "$PUBLISHED" = "$V" ]; then echo "sdk@${V} already published, skipping."; else npm publish --provenance --access public; fi
+          if [ "$PUBLISHED" = "$V" ]; then echo "sdk@${V} already published, skipping."; else pnpm publish --provenance --access public --no-git-checks; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -206,7 +225,7 @@ jobs:
         run: |
           V=$(node -p "require('./package.json').version")
           PUBLISHED=$(npm view @rep-protocol/cli@${V} version 2>/dev/null || true)
-          if [ "$PUBLISHED" = "$V" ]; then echo "cli@${V} already published, skipping."; else npm publish --provenance --access public; fi
+          if [ "$PUBLISHED" = "$V" ]; then echo "cli@${V} already published, skipping."; else pnpm publish --provenance --access public --no-git-checks; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -215,7 +234,7 @@ jobs:
         run: |
           V=$(node -p "require('./package.json').version")
           PUBLISHED=$(npm view @rep-protocol/codemod@${V} version 2>/dev/null || true)
-          if [ "$PUBLISHED" = "$V" ]; then echo "codemod@${V} already published, skipping."; else npm publish --provenance --access public; fi
+          if [ "$PUBLISHED" = "$V" ]; then echo "codemod@${V} already published, skipping."; else pnpm publish --provenance --access public --no-git-checks; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -224,7 +243,7 @@ jobs:
         run: |
           V=$(node -p "require('./package.json').version")
           PUBLISHED=$(npm view @rep-protocol/react@${V} version 2>/dev/null || true)
-          if [ "$PUBLISHED" = "$V" ]; then echo "react@${V} already published, skipping."; else npm publish --provenance --access public; fi
+          if [ "$PUBLISHED" = "$V" ]; then echo "react@${V} already published, skipping."; else pnpm publish --provenance --access public --no-git-checks; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -233,7 +252,7 @@ jobs:
         run: |
           V=$(node -p "require('./package.json').version")
           PUBLISHED=$(npm view @rep-protocol/vue@${V} version 2>/dev/null || true)
-          if [ "$PUBLISHED" = "$V" ]; then echo "vue@${V} already published, skipping."; else npm publish --provenance --access public; fi
+          if [ "$PUBLISHED" = "$V" ]; then echo "vue@${V} already published, skipping."; else pnpm publish --provenance --access public --no-git-checks; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
@@ -242,7 +261,7 @@ jobs:
         run: |
           V=$(node -p "require('./package.json').version")
           PUBLISHED=$(npm view @rep-protocol/svelte@${V} version 2>/dev/null || true)
-          if [ "$PUBLISHED" = "$V" ]; then echo "svelte@${V} already published, skipping."; else npm publish --provenance --access public; fi
+          if [ "$PUBLISHED" = "$V" ]; then echo "svelte@${V} already published, skipping."; else pnpm publish --provenance --access public --no-git-checks; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

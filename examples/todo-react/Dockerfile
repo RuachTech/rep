@@ -23,7 +23,7 @@ ARG TARGETARCH=amd64
 RUN apk add --no-cache curl ca-certificates && \
     ARCHIVE="rep-gateway_${GATEWAY_VERSION}_linux_${TARGETARCH}.tar.gz" && \
     curl -fsSL \
-      "https://github.com/RuachTech/rep/releases/download/gateway/v${GATEWAY_VERSION}/${ARCHIVE}" \
+      "https://github.com/RuachTech/rep/releases/download/v${GATEWAY_VERSION}/${ARCHIVE}" \
       -o /tmp/gateway.tar.gz && \
     tar -xzf /tmp/gateway.tar.gz -C /tmp && \
     mv /tmp/rep-gateway /rep-gateway && \
@@ -35,8 +35,9 @@ FROM node:20-alpine AS app
 WORKDIR /app
 
 # Copy package files and install dependencies from npm registry.
-COPY package.json package-lock.json* ./
-RUN npm install
+COPY package.json ./
+# install on main deps only,
+RUN npm install --omit=dev
 
 # Copy source and build.
 COPY . .
