@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/RuachTech/rep/compare/react-v0.1.5...react-v0.1.6) (2026-02-26)
+
+
+### Miscellaneous Chores
+
+* **react:** Synchronize rep-packages versions
+
 ## [0.1.5](https://github.com/RuachTech/rep/compare/react-v0.1.4...react-v0.1.5) (2026-02-25)
 
 

@@ -1,9 +1,9 @@
 {
-  "sdk": "0.1.5",
-  "cli": "0.1.5",
-  "codemod": "0.1.5",
-  "adapters/react": "0.1.5",
-  "adapters/vue": "0.1.5",
-  "adapters/svelte": "0.1.5",
+  "sdk": "0.1.6",
+  "cli": "0.1.6",
+  "codemod": "0.1.6",
+  "adapters/react": "0.1.6",
+  "adapters/vue": "0.1.6",
+  "adapters/svelte": "0.1.6",
   "gateway": "0.1.3"
 }

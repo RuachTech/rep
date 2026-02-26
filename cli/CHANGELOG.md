@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/RuachTech/rep/compare/cli-v0.1.5...cli-v0.1.6) (2026-02-26)
+
+
+### Bug Fixes
+
+* Update dependencies for security and clarify gateway binary documentation ([#18](https://github.com/RuachTech/rep/issues/18)) ([be751d5](https://github.com/RuachTech/rep/commit/be751d57434d0bbafde1bfbb5b9ab7adf600e6a9))
+
 ## [0.1.5](https://github.com/RuachTech/rep/compare/cli-v0.1.4...cli-v0.1.5) (2026-02-25)
 
 

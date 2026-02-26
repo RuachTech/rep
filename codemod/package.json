@@ -1,6 +1,6 @@
 {
   "name": "@rep-protocol/codemod",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Codemods for migrating to the Runtime Environment Protocol (REP).",
   "bin": {
     "rep-codemod": "./bin/rep-codemod.js"
