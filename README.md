@@ -2,145 +2,34 @@
 
 **Build once. Configure anywhere. Securely.**
 
-REP is an open specification and reference implementation for injecting environment variables into browser-hosted applications at runtime — with security classification, integrity verification, and zero build-tool coupling.
+REP is an open protocol for injecting environment variables into browser apps **at container runtime** — not build time. It gives you security classification, encryption, integrity verification, and hot reload, with zero build-tool coupling.
 
-[**Watch the demo**](https://github.com/RuachTech/rep/releases/download/v0.1.3/rep-gateway-demo.mp4) — hot reload and feature flags without rebuilding.
+[Documentation](https://rep-protocol.dev)
 
----
+## Quick Start
 
-## The Problem
-
-Every modern frontend framework (React, Vue, Svelte, Angular, Solid, etc.) resolves environment variables at **build time** via static string replacement. The resulting bundle is plain JS/HTML/CSS — there is no `process` object, no runtime, no server. The browser has no concept of environment variables.
-
-This creates a fundamental contradiction:
-
-> **Containers are designed to be environment-agnostic artifacts, but frontend builds are environment-specific artifacts.**
-
-The consequences are severe:
-
-- **One image per environment.** You build `app:staging`, `app:prod`, `app:dev` — each with baked-in config. This defeats Docker's entire value proposition.
-- **Broken CI/CD promotion.** The image that passed your tests is a different binary than what goes to prod.
-- **Config changes require redeployment.** Changed an API URL? Rebuild and redeploy, even though zero application code changed.
-- **No security model.** Every existing workaround treats all env vars as flat, unclassified, plaintext strings dumped into `window.__ENV__`.
-
-## Existing Solutions and Why They Fall Short
-
-| Approach | Limitation |
-|---|---|
-| `envsubst` / `sed` on JS bundles at container start | Fragile string replacement on minified code. Mutates container filesystem. |
-| Fetch `/config.json` at app startup | Network dependency, loading delay, race conditions. |
-| `window.__ENV__` via shell script | No standard, no security model, requires Node.js or bash in prod container. |
-| Build-tool plugins (`import-meta-env`, `vite-plugin-runtime-env`) | Couples your build pipeline. Doesn't address security. Framework-specific. |
-
-**None of these have a security model. None verify integrity. None classify variables by sensitivity. None are standardised.**
-
-## What REP Does Differently
-
-REP is not another env injection hack. It is a **protocol specification** with a **security-first design** that operates entirely at the infrastructure layer — no build tool plugins, no framework coupling, no application code changes beyond swapping `import.meta.env.X` for `rep.get('X')`.
-
-### Core Differentiators
-
-| Capability | Existing Tools | REP |
-|---|---|---|
-| Security classification (public / sensitive / server-only) | ❌ | ✅ |
-| Encrypted sensitive variables | ❌ | ✅ |
-| Framework agnostic | Partial | ✅ |
-| Build tool dependency | Required | None |
-| Integrity verification (HMAC + SRI) | ❌ | ✅ |
-| Automatic secret leak detection | ❌ | ✅ |
-| Hot config reload (SSE) | ❌ | ✅ |
-| Standalone binary (no Node.js / bash) | ❌ | ✅ |
-| Formal specification | ❌ | ✅ |
-
-## Project Structure
-
-```
-rep/
-├── README.md                    # This file
-├── spec/
-│   ├── REP-RFC-0001.md          # The protocol specification
-│   ├── SECURITY-MODEL.md        # Detailed security analysis and threat model
-│   └── INTEGRATION-GUIDE.md     # Framework integration patterns
-├── schema/
-│   ├── rep-manifest.schema.json # JSON Schema for .rep.yaml manifest
-│   └── rep-payload.schema.json  # JSON Schema for injected payload
-├── gateway/                     # Go implementation of REP gateway
-├── sdk/                         # @rep-protocol/sdk (TypeScript)
-├── cli/                         # @rep-protocol/cli (TypeScript)
-├── adapters/                    # Framework adapters (React, Vue, Svelte)
-├── codemod/                     # @rep-protocol/codemod (migration tool)
-└── examples/
-    ├── nginx-basic/             # Minimal nginx + REP gateway
-    ├── caddy-basic/             # Minimal caddy + REP gateway
-    └── kubernetes/              # K8s deployment with ConfigMap hot reload
-```
-
-## Development Setup
-
-This project uses **pnpm workspaces** for managing the monorepo. All TypeScript packages (SDK, CLI, adapters, codemod) are managed as workspace packages with efficient dependency hoisting.
-
-### Prerequisites
-
-- **Node.js** >= 20.0.0
-- **pnpm** >= 9.0.0 (install via `npm install -g pnpm`)
-- **Go** >= 1.24.5 (for gateway development)
-
-### Installation
+### 1. Install the SDK
 
 ```bash
-# Clone the repository
-git clone https://github.com/ruachtech/rep.git
-cd rep
-
-# Install all workspace dependencies
-pnpm install
-
-# Build all packages
-pnpm run build
-
-# Run tests across all packages
-pnpm run test
+npm install @rep-protocol/sdk
 ```
 
-### Workspace Commands
+### 2. Replace your env var calls
 
-```bash
-# Build a specific package
-pnpm --filter @rep-protocol/sdk run build
-pnpm --filter @rep-protocol/cli run build
-
-# Run SDK in watch mode
-pnpm run dev:sdk
-
-# Run CLI in watch mode
-pnpm run dev:cli
-
-# Run tests for a specific package
-pnpm --filter @rep-protocol/sdk run test
-
-# Clean all build artifacts
-pnpm run clean
+```diff
+- const apiUrl = import.meta.env.VITE_API_URL;
++ import { rep } from '@rep-protocol/sdk';
++ const apiUrl = rep.get('API_URL');  // synchronous, no loading state
 ```
 
-### Package Dependencies
-
-The workspace is configured so that:
-- All adapters (`@rep-protocol/react`, `@rep-protocol/vue`, `@rep-protocol/svelte`) depend on `@rep-protocol/sdk` via `workspace:*` protocol
-- Shared dev dependencies (`typescript`, `vitest`, `tsup`) are hoisted to the root
-- Each package maintains its own production dependencies
-
-**Note:** This project uses pnpm exclusively. `package-lock.json` and `yarn.lock` files are ignored. Always use `pnpm install` instead of `npm install`.
-
-## Quick Start (Conceptual)
+### 3. Add the gateway to your Dockerfile
 
 ```dockerfile
-# Your existing multi-stage frontend Dockerfile
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY . .
 RUN npm ci && npm run build
 
-# Add REP gateway — single binary, ~6MB
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY --from=ghcr.io/ruachtech/rep/gateway:latest /usr/local/bin/rep-gateway /usr/local/bin/rep-gateway
@@ -149,8 +38,172 @@ ENTRYPOINT ["rep-gateway"]
 CMD ["--upstream", "nginx", "--port", "8080"]
 ```
 
+### 4. Pass config at runtime
+
+```bash
+docker run -p 8080:8080 \
+  -e REP_PUBLIC_API_URL=https://api.example.com \
+  -e REP_PUBLIC_FEATURE_FLAGS=dark-mode,beta \
+  -e REP_SENSITIVE_ANALYTICS_KEY=UA-12345-1 \
+  myapp:latest
+```
+
+Same image, different config per environment. Done.
+
+---
+
+## Packages
+
+All packages are published to npm under the `@rep-protocol` scope.
+
+| Package | Install | Description |
+|---|---|---|
+| [`@rep-protocol/sdk`](https://www.npmjs.com/package/@rep-protocol/sdk) | `npm i @rep-protocol/sdk` | Core SDK — zero dependencies, ~1.5KB gzipped |
+| [`@rep-protocol/react`](https://www.npmjs.com/package/@rep-protocol/react) | `npm i @rep-protocol/react` | React hooks — `useRep()`, `useRepSecure()` |
+| [`@rep-protocol/vue`](https://www.npmjs.com/package/@rep-protocol/vue) | `npm i @rep-protocol/vue` | Vue composables — `useRep()`, `useRepSecure()` |
+| [`@rep-protocol/svelte`](https://www.npmjs.com/package/@rep-protocol/svelte) | `npm i @rep-protocol/svelte` | Svelte stores — `repStore()`, `repSecureStore()` |
+| [`@rep-protocol/cli`](https://www.npmjs.com/package/@rep-protocol/cli) | `npm i -D @rep-protocol/cli` | CLI — `rep dev`, `rep lint`, `rep validate`, `rep typegen` |
+| [`@rep-protocol/codemod`](https://www.npmjs.com/package/@rep-protocol/codemod) | `npx @rep-protocol/codemod` | Auto-migrate from Vite, CRA, or Next.js env patterns |
+
+---
+
+## SDK Usage
+
+### Core SDK (any framework)
+
+```typescript
+import { rep } from '@rep-protocol/sdk';
+
+// PUBLIC vars — synchronous, no async, no loading state
+const apiUrl = rep.get('API_URL');
+const flags  = rep.get('FEATURE_FLAGS');
+
+// SENSITIVE vars — encrypted, decrypted on demand
+const key = await rep.getSecure('ANALYTICS_KEY');
+
+// Hot reload — react to config changes without page refresh
+rep.onChange('FEATURE_FLAGS', (newValue, oldValue) => {
+  console.log(`Flags changed: ${oldValue} → ${newValue}`);
+});
+```
+
+### React
+
+```bash
+npm install @rep-protocol/sdk @rep-protocol/react
+```
+
+```tsx
+import { useRep, useRepSecure } from '@rep-protocol/react';
+
+function App() {
+  const apiUrl = useRep('API_URL');
+  const flags  = useRep('FEATURE_FLAGS', 'defaults');
+  const { value: analyticsKey, loading } = useRepSecure('ANALYTICS_KEY');
+
+  // Auto re-renders on hot reload config changes
+  return <div>API: {apiUrl}</div>;
+}
+```
+
+### Vue
+
+```bash
+npm install @rep-protocol/sdk @rep-protocol/vue
+```
+
+```vue
+<script setup>
+import { useRep, useRepSecure } from '@rep-protocol/vue';
+
+const apiUrl = useRep('API_URL');
+const analyticsKey = useRepSecure('ANALYTICS_KEY');
+</script>
+
+<template>
+  <div>API: {{ apiUrl }}</div>
+</template>
+```
+
+### Svelte
+
+```bash
+npm install @rep-protocol/sdk @rep-protocol/svelte
+```
+
+```svelte
+<script>
+  import { repStore, repSecureStore } from '@rep-protocol/svelte';
+
+  const apiUrl = repStore('API_URL');
+  const analyticsKey = repSecureStore('ANALYTICS_KEY');
+</script>
+
+<div>API: {$apiUrl}</div>
+```
+
+---
+
+## How Variables Work
+
+REP uses a prefix convention to classify variables into security tiers:
+
+| Prefix | Tier | Behaviour |
+|---|---|---|
+| `REP_PUBLIC_*` | PUBLIC | Plaintext in page source. Synchronous access via `rep.get()`. |
+| `REP_SENSITIVE_*` | SENSITIVE | AES-256-GCM encrypted. Async access via `rep.getSecure()`. |
+| `REP_SERVER_*` | SERVER | **Never sent to the browser.** Gateway-only. |
+
+Prefixes are stripped in code: `REP_PUBLIC_API_URL` becomes `rep.get('API_URL')`.
+
+---
+
+## Migration
+
+Migrate an existing project automatically with the codemod:
+
+```bash
+# Vite project
+npx @rep-protocol/codemod --framework vite --src ./src
+
+# Create React App
+npx @rep-protocol/codemod --framework cra --src ./src
+
+# Next.js
+npx @rep-protocol/codemod --framework next --src ./src
+```
+
+This transforms `import.meta.env.VITE_*` / `process.env.REACT_APP_*` / `process.env.NEXT_PUBLIC_*` calls into `rep.get()` calls and adds the SDK import.
+
+---
+
+## CLI
+
+The CLI bundles a platform-specific gateway binary and provides development tools:
+
+```bash
+npm install -D @rep-protocol/cli
+
+# Local dev server (wraps the gateway)
+npx rep dev --env-file .env
+
+# Scan your built bundle for leaked secrets
+npx rep lint ./dist
+
+# Validate your .rep.yaml manifest
+npx rep validate
+
+# Generate TypeScript types from your manifest
+npx rep typegen
+```
+
+---
+
+## Deployment
+
+### Docker Compose — same image, per-environment config
+
 ```yaml
-# docker-compose.yml — same image, different config
 services:
   frontend-staging:
     image: myapp:latest
@@ -169,49 +222,99 @@ services:
       REP_SERVER_INTERNAL_SECRET: "also-never-reaches-browser"
 ```
 
-```typescript
-// In your application — framework agnostic
-import { rep } from '@rep-protocol/sdk';
+### Minimal `FROM scratch` container
 
-const apiUrl = rep.get('API_URL');           // Synchronous, immediate
-const flags  = rep.get('FEATURE_FLAGS');     // No async, no loading state
-const key    = await rep.getSecure('ANALYTICS_KEY');  // Decrypted on demand
+The gateway is a static Go binary with zero dependencies. You can run it in a scratch container:
 
-rep.onChange('FEATURE_FLAGS', (newVal) => {   // Hot reload
-  // React to config change without page reload
-});
+```dockerfile
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY . .
+RUN npm ci && npm run build
+
+FROM scratch
+COPY --from=ghcr.io/ruachtech/rep/gateway:latest /usr/local/bin/rep-gateway /rep-gateway
+COPY --from=build /app/dist /static
+USER 65534:65534
+EXPOSE 8080
+ENTRYPOINT ["/rep-gateway", "--mode", "embedded", "--static-dir", "/static"]
 ```
 
-## Specification Status
+### Gateway modes
 
-| Document | Status | Version |
-|---|---|---|
-| [REP-RFC-0001](spec/REP-RFC-0001.md) | **Active** | 0.1.0 |
-| [Security Model](spec/SECURITY-MODEL.md) | **Active** | 0.1.0 |
-| [Integration Guide](spec/INTEGRATION-GUIDE.md) | **Active** | 0.1.0 |
+- **Proxy mode** (default): Reverse proxy to an upstream (nginx, caddy). Injects config into proxied HTML responses.
+- **Embedded mode**: Serves static files directly. No upstream needed. Enables `FROM scratch` containers.
 
-## Releases & Versioning
+---
 
-All npm packages (`@rep-protocol/sdk`, `@rep-protocol/cli`, `@rep-protocol/codemod`, and the framework adapters) share a single version number and are released together using [release-please](https://github.com/googleapis/release-please).
+## The Problem REP Solves
 
-- Versions are determined automatically from **conventional commits** on `main`
-- `fix: ...` → patch bump, `feat: ...` → minor bump, `feat!: ...` → major bump
-- On push to `main`, a Release PR is created/updated with version bumps and changelogs
-- Merging the Release PR triggers npm publishing for all packages
-- The Go gateway is versioned independently via `gateway/VERSION` and released through GoReleaser
+Every frontend framework resolves environment variables at **build time** via static string replacement. The resulting bundle is plain JS/HTML/CSS — there is no `process` object, no runtime. The browser has no concept of environment variables.
+
+This means:
+- **One image per environment.** You build `app:staging`, `app:prod`, `app:dev` — each with baked-in config.
+- **Broken CI/CD promotion.** The image that passed your tests is a different binary than what goes to prod.
+- **Config changes require redeployment.** Changed an API URL? Rebuild and redeploy.
+- **No security model.** Every workaround dumps all env vars as plaintext into `window.__ENV__`.
+
+### Why existing solutions fall short
+
+| Approach | Limitation |
+|---|---|
+| `envsubst` / `sed` on JS bundles | Fragile string replacement on minified code. Mutates container filesystem. |
+| Fetch `/config.json` at startup | Network dependency, loading delay, race conditions. |
+| `window.__ENV__` via shell script | No standard, no security model, requires Node.js or bash in prod container. |
+| Build-tool plugins | Couples your build pipeline. Framework-specific. No security. |
+
+---
+
+## Security Model
+
+REP has a security-first design:
+
+- **AES-256-GCM encryption** for sensitive variables
+- **HMAC-SHA256 integrity verification** + SRI hashing on every payload
+- **Automatic secret detection** — Shannon entropy analysis + known key format matching (AWS keys, JWTs, GitHub tokens, etc.)
+- **Single-use session keys** with 30-second TTL and rate limiting
+- **Ephemeral keys** generated at startup, never persisted to disk
+- **`--strict` mode** turns secret detection warnings into hard failures
+
+Full threat model: [spec/SECURITY-MODEL.md](spec/SECURITY-MODEL.md)
+
+---
+
+## Specification
+
+REP is a formal, open specification — not just a tool.
+
+| Document | Status |
+|---|---|
+| [REP-RFC-0001](spec/REP-RFC-0001.md) | Active |
+| [Security Model](spec/SECURITY-MODEL.md) | Active |
+| [Integration Guide](spec/INTEGRATION-GUIDE.md) | Active |
+
+---
 
 ## Contributing
 
-We welcome contributions! Please read our [Contributing Guide](CONTRIBUTING.md) for details on:
+We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, commit conventions, and the release process.
 
-- Development setup and workflow
-- Commit message conventions (conventional commits required)
-- How the automated release process works
-- Code style guidelines for Go and TypeScript
+### Development setup
+
+```bash
+git clone https://github.com/ruachtech/rep.git
+cd rep
+pnpm install     # requires pnpm >= 9.0.0
+pnpm -r build    # build all packages
+pnpm -r test     # test all packages
+
+# Gateway (requires Go >= 1.24.5)
+cd gateway && make test
+```
 
 ## License
 
-This specification is released under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Reference implementations are released under the [Apache 2.0 License](https://www.apache.org/licenses/LICENSE-2.0).
+Specification: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Code: [Apache 2.0](https://www.apache.org/licenses/LICENSE-2.0).
 
 ---
 
