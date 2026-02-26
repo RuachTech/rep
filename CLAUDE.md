@@ -225,7 +225,7 @@ Full threat analysis in `spec/SECURITY-MODEL.md`.
 
 | Decision | Rationale |
 |---|---|
-| **Go for the gateway** | Static compilation (CGO_ENABLED=0), zero runtime deps, ~3MB binary, `FROM scratch` compatible. No Node.js or bash needed in prod. |
+| **Go for the gateway** | Static compilation (CGO_ENABLED=0), zero runtime deps, ~7MB binary, `FROM scratch` compatible. No Node.js or bash needed in prod. |
 | **Zero external Go dependencies** | Minimises supply chain risk. Only stdlib + crypto. Manifest parsing uses a hand-rolled YAML subset parser (~250 lines) to maintain this constraint. |
 | **`pkg/payload` imports from `internal/`** | Valid Go — `internal/` rule only restricts imports from outside the parent directory tree. Both live under `gateway/`. |
 | **`inject.go` strips `Accept-Encoding`** | Upstreams always respond with identity encoding, avoiding decompress/recompress. Gzip fallback via `compress/gzip` (stdlib) for non-compliant upstreams. Brotli unsupported (no stdlib, zero-dep constraint) — logged and passed through uninjected. |

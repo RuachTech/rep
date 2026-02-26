@@ -21,7 +21,7 @@ import { Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
   <video controls playsinline preload="metadata" style="width: 100%; border-radius: 8px; border: 1px solid var(--sl-color-gray-5);">
     <source src="https://github.com/RuachTech/rep/releases/download/v0.1.3/rep-gateway-demo.mp4" type="video/mp4" />
   </video>
-  <p style="text-align: center; font-size: 0.85rem; color: var(--sl-color-gray-3); margin-top: 0.5rem;">Hot reload and feature flags — no rebuild, no redeploy.</p>
+  <p style="text-align: center; font-size: 0.85rem; color: var(--sl-color-gray-3); margin-top: 0.5rem;">Same frontend image, different environment, dynamic variables — no rebuild, no redeploy.</p>
 </div>
 
 ## The Problem
@@ -68,7 +68,7 @@ REP operates at the **infrastructure layer** — no build-tool plugins, no frame
 
 <CardGrid>
   <Card title="Containers" icon="rocket">
-    Reverse proxy mode sits in front of nginx, caddy, or any upstream. Embedded mode serves static files directly from a `FROM scratch` image (~3MB).
+    Reverse proxy mode sits in front of nginx, caddy, or any upstream. Embedded mode serves static files directly from a `FROM scratch` image.
   </Card>
   <Card title="Static Builds" icon="document">
     Build your app once with `npm run build`. The gateway injects config into the static HTML at serve time — same artifact for every environment.
@@ -89,7 +89,7 @@ REP operates at the **infrastructure layer** — no build-tool plugins, no frame
 | Fetch `/config.json` at runtime | -- | -- | -- | -- | -- |
 | `window.__ENV__` via shell script | -- | -- | -- | -- | -- |
 | Build-tool plugins (dotenv, etc.) | -- | -- | -- | -- | -- |
-| **REP** | **3-tier** | **AES-256-GCM** | **HMAC + SRI** | **SSE** | **~3MB Go** |
+| **REP** | **3-tier** | **AES-256-GCM** | **HMAC + SRI** | **SSE** | **~6MB Go** |
 
 ## Quick Example
 
@@ -148,7 +148,7 @@ REP_SERVER_DB_PASSWORD=never-reaches-browser
 
 <CardGrid>
   <Card title="Gateway" icon="rocket">
-    Go binary (~3MB). Zero dependencies. `FROM scratch` compatible. Proxy or embedded mode.
+    Go binary (~6MB). Zero dependencies. `FROM scratch` compatible. Proxy or embedded mode.
   </Card>
   <Card title="SDK" icon="document">
     TypeScript. Zero runtime deps. ~1.5KB gzipped. Synchronous `get()`, async `getSecure()`.

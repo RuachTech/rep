@@ -140,7 +140,7 @@ WORKDIR /app
 COPY . .
 RUN npm ci && npm run build
 
-# Add REP gateway — single binary, ~3MB
+# Add REP gateway — single binary, ~6MB
 FROM nginx:alpine
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY --from=ghcr.io/ruachtech/rep/gateway:latest /usr/local/bin/rep-gateway /usr/local/bin/rep-gateway
