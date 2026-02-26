@@ -36,8 +36,7 @@ WORKDIR /app
 
 # Copy package files and install dependencies from npm registry.
 COPY package.json ./
-# install on main deps only,
-RUN npm install --omit=dev
+RUN npm install
 
 # Copy source and build.
 COPY . .

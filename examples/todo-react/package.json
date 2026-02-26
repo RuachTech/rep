@@ -14,8 +14,8 @@
     "rep:serve": "rep dev --port 3000 --env .env.local --static ./dist --hot-reload"
   },
   "dependencies": {
-    "@rep-protocol/react": "^0.1.4",
-    "@rep-protocol/sdk": "^0.1.4",
+    "@rep-protocol/react": "^0.1.6",
+    "@rep-protocol/sdk": "^0.1.6",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"
   },
