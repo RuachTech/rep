@@ -31,8 +31,44 @@ export default defineConfig({
         {
           tag: 'meta',
           attrs: {
+            property: 'og:type',
+            content: 'website',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            property: 'og:site_name',
+            content: 'REP — Runtime Environment Protocol',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
             property: 'og:image',
-            content: '/og-image.png',
+            content: 'https://rep-protocol.dev/og-image.png',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'twitter:card',
+            content: 'summary_large_image',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'twitter:image',
+            content: 'https://rep-protocol.dev/og-image.png',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'keywords',
+            content:
+              'runtime environment variables, docker frontend config, inject env vars browser, runtime config react, environment variables containers, build once deploy anywhere, frontend environment variables docker, runtime configuration protocol',
           },
         },
       ],
