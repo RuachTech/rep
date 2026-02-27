@@ -86,7 +86,11 @@ async function downloadBinary(target) {
   }
 
   process.stdout.write('  Extracting... ');
-  execSync(`tar -xf "${archivePath}" -C "${tmpDir}"`, { stdio: 'pipe' });
+  if (IS_WINDOWS) {
+    execSync(`powershell -Command "Expand-Archive -Path '${archivePath}' -DestinationPath '${tmpDir}' -Force"`, { stdio: 'pipe' });
+  } else {
+    execSync(`tar -xf "${archivePath}" -C "${tmpDir}"`, { stdio: 'pipe' });
+  }
   process.stdout.write('done\n');
 
   const extracted = path.join(tmpDir, GATEWAY_BIN_NAME);
