@@ -1,6 +1,6 @@
 {
   "name": "@rep-protocol/sdk",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Client SDK for the Runtime Environment Protocol (REP). Zero-dependency, framework-agnostic runtime env var access for browser applications.",
   "author": "Ruach Tech",
   "license": "Apache-2.0",
