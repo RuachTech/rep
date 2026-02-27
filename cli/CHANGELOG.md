@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/RuachTech/rep/compare/cli-v0.1.6...cli-v0.1.7) (2026-02-27)
+
+
+### Bug Fixes
+
+* **cli:** use PowerShell Expand-Archive for zip extraction on Windows ([#21](https://github.com/RuachTech/rep/issues/21)) ([f8cd44c](https://github.com/RuachTech/rep/commit/f8cd44cec12a8b8d663e7695042d694f63103600))
+
 ## [0.1.6](https://github.com/RuachTech/rep/compare/cli-v0.1.5...cli-v0.1.6) (2026-02-26)
 
 
