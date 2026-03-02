@@ -42,6 +42,8 @@ jobs:
   recover-stale-releases:
     name: Recover Stale Releases
     runs-on: ubuntu-latest
+    outputs:
+      npm_tags_created: ${{ steps.recover.outputs.npm_tags_created }}
     # Runs on every trigger but steps are conditioned on push events.
     # This ensures the job always succeeds (never "skipped"), so downstream
     # jobs can depend on it without if: always() — which breaks output propagation.
@@ -52,6 +54,7 @@ jobs:
           fetch-depth: 0
 
       - name: Create missing manifest tags and relabel stale PRs
+        id: recover
         if: github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -88,6 +91,10 @@ jobs:
               TAGGED=1
             fi
           done
+
+          # Signal that new npm package tags were created (release PR was merged
+          # but release-please failed to tag — common with grouped PRs).
+          echo "npm_tags_created=${TAGGED}" >> "$GITHUB_OUTPUT"
 
           # If we just created tags, find any merged release PRs that are still
           # labeled 'autorelease: pending' and flip them to 'autorelease: tagged'
@@ -135,7 +142,7 @@ jobs:
             fi
           done
 
-          for token in '${scope}' '${version}'; do
+          for token in '${scope}'; do
             if [[ "$group_pattern" != *"$token"* ]]; then
               echo "::error::group-pull-request-title-pattern must include $token"
               exit 1
@@ -171,8 +178,20 @@ jobs:
             echo "::notice::workflow_dispatch — npm_publish=${NPM_PUBLISH}, gateway_release_created=${GATEWAY_RELEASE_CREATED}, gateway_tag=${GATEWAY_TAG}"
           else
             # All npm packages use linked-versions, so sdk is representative.
-            # No fallback to releases_created — that includes gateway-only releases.
-            NPM_PUBLISH="${{ steps.release.outputs['sdk--release_created'] }}"
+            RP_NPM="${{ steps.release.outputs['sdk--release_created'] }}"
+
+            # Fallback: release-please cannot create GitHub Releases from grouped
+            # PRs (the merged PR title lacks ${component}). When that happens the
+            # recover-stale-releases job still creates the git tags. Use its
+            # npm_tags_created output as a reliable signal that a release PR was
+            # merged and npm packages should be published.
+            RECOVER_NPM="${{ needs.recover-stale-releases.outputs.npm_tags_created }}"
+
+            if [[ "$RP_NPM" == "true" || "$RECOVER_NPM" == "1" ]]; then
+              NPM_PUBLISH="true"
+            else
+              NPM_PUBLISH=""
+            fi
 
             {
               echo "releases_created=${{ steps.release.outputs.releases_created }}"
@@ -182,7 +201,7 @@ jobs:
               echo "npm_publish=${NPM_PUBLISH}"
             } >> "$GITHUB_OUTPUT"
 
-            echo "::notice::push — releases_created=${{ steps.release.outputs.releases_created }}, npm_publish=${NPM_PUBLISH}, gateway=${{ steps.release.outputs['gateway--release_created'] }}"
+            echo "::notice::push — releases_created=${{ steps.release.outputs.releases_created }}, rp_npm=${RP_NPM}, recover_npm=${RECOVER_NPM}, npm_publish=${NPM_PUBLISH}, gateway=${{ steps.release.outputs['gateway--release_created'] }}"
           fi
 
   publish-npm:
