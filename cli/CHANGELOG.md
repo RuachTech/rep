@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.8](https://github.com/RuachTech/rep/compare/cli-v0.1.7...cli-v0.1.8) (2026-03-05)
+
+
+### Bug Fixes
+
+* **cli:** bundle schema file with package to fix validate/typegen when installed from npm ([4ab0a29](https://github.com/RuachTech/rep/commit/4ab0a29b43e4e927d262e7500f8168b08da6eaab))
+* **cli:** bundle schema with package to fix validate/typegen after npm install ([#24](https://github.com/RuachTech/rep/issues/24)) ([4ab0a29](https://github.com/RuachTech/rep/commit/4ab0a29b43e4e927d262e7500f8168b08da6eaab))
+
 ## [0.1.7](https://github.com/RuachTech/rep/compare/cli-v0.1.6...cli-v0.1.7) (2026-02-27)
 
 
