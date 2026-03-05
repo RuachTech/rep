@@ -26,8 +26,9 @@
   },
   "files": [
     "dist",
-    "bin",
-    "scripts",
+    "bin/rep.js",
+    "scripts/postinstall.js",
+    "schema",
     "README.md",
     "LICENSE"
   ],
