@@ -1,0 +1,190 @@
+---
+title: Next.js — Proxy Mode
+description: Run the REP gateway as a reverse proxy in front of a Next.js SSR server. Environment variables are injected into every HTML response without touching the Next.js build.
+---
+
+import { Aside, FileTree } from '@astrojs/starlight/components';
+
+The REP gateway runs in **proxy mode** in front of a Next.js server. It intercepts every HTML response and injects the `__rep__` payload — no changes to the Next.js build pipeline required.
+
+Source code at [`examples/nextjs-proxy/`](https://github.com/ruachtech/rep/tree/main/examples/nextjs-proxy).
+
+## Architecture
+
+```
+Client → REP Gateway :8080 (proxy mode)
+              ↓ injects __rep__ payload into HTML responses
+         Next.js Server :3000
+```
+
+The Next.js server is never exposed directly. All traffic flows through the gateway. Config lives entirely in the gateway's environment variables — the Next.js image is the same across every deployment.
+
+## When to use this pattern
+
+- Next.js App Router or Pages Router with server-side rendering (SSR)
+- You want the full Next.js server (streaming, server actions, API routes)
+- Docker Compose or Kubernetes multi-container pod deployments
+
+## File structure
+
+<FileTree>
+- examples/nextjs-proxy/
+  - src/
+    - app/
+      - layout.tsx
+      - page.tsx  Server component shell
+    - components/
+      - EnvDisplay.tsx  Client component — reads REP vars
+  - Dockerfile  Builds the Next.js server
+  - docker-compose.yml  Gateway + Next.js as two services
+  - next.config.ts
+  - .rep.yaml
+  - .env.example
+</FileTree>
+
+## Reading REP vars in Next.js
+
+REP runs entirely in the browser. In the App Router, use `'use client'` components:
+
+```tsx
+'use client';
+
+import { useRep, useRepSecure } from '@rep-protocol/react';
+
+export function EnvDisplay() {
+  // Synchronous — available on first render, no loading state
+  const apiUrl   = useRep('API_URL',  'http://localhost:3001');
+  const envName  = useRep('ENV_NAME', 'development');
+  const features = useRep('FEATURE_FLAGS', '');
+
+  // Async — decrypted via the session-key endpoint
+  const { value: analyticsKey, loading } = useRepSecure('ANALYTICS_KEY');
+
+  return (
+    <div>
+      <p>Environment: {envName}</p>
+      <p>API: {apiUrl}</p>
+      <p>Key: {loading ? 'loading…' : analyticsKey}</p>
+    </div>
+  );
+}
+```
+
+<Aside type="caution">
+  Do NOT call `rep.get()` in server components — the `__rep__` payload exists only in the browser DOM. REP vars are always accessed from `'use client'` components.
+</Aside>
+
+## Docker Compose setup
+
+The [`docker-compose.yml`](https://github.com/ruachtech/rep/blob/main/examples/nextjs-proxy/docker-compose.yml) runs both services:
+
+```yaml
+services:
+  gateway:
+    image: ghcr.io/ruachtech/rep/gateway:0.1.3
+    ports:
+      - "8080:8080"
+    environment:
+      REP_GATEWAY_MODE: proxy
+      REP_GATEWAY_UPSTREAM: "app:3000"
+      # App config — change these per environment, NOT the Next.js image
+      REP_PUBLIC_API_URL: "https://api.example.com"
+      REP_PUBLIC_ENV_NAME: "production"
+      REP_PUBLIC_FEATURE_FLAGS: "dark-mode"
+      REP_SENSITIVE_ANALYTICS_KEY: "ak_live_abc123"
+    depends_on:
+      - app
+
+  app:
+    build: .
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+    # No REP_PUBLIC_* vars here — gateway injects them at request time
+```
+
+## Running locally
+
+### Docker Compose
+
+```bash
+cd examples/nextjs-proxy
+docker compose up
+```
+
+Open `http://localhost:8080`. The gateway proxies to Next.js and injects config.
+
+### Changing config without rebuilding
+
+```bash
+# Edit docker-compose.yml to update REP_PUBLIC_* vars, then:
+docker compose up -d gateway   # restart only the gateway
+```
+
+The Next.js image is untouched. New config is live immediately.
+
+### CLI dev mode (no Docker)
+
+```bash
+# Terminal 1 — run Next.js dev server
+npm run dev   # starts on :3000
+
+# Terminal 2 — run REP gateway in proxy mode
+npx @rep-protocol/cli dev --proxy http://localhost:3000 --env-file .env.local
+```
+
+Open `http://localhost:8080`.
+
+## Dockerfile (Next.js only)
+
+The Next.js Dockerfile builds a standalone server. The gateway is a separate image:
+
+```dockerfile
+FROM node:22-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci --omit=dev
+
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm run build
+
+FROM node:22-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+USER 1001
+EXPOSE 3000
+CMD ["node", "server.js"]
+```
+
+Enable standalone output in `next.config.ts`:
+
+```typescript
+const nextConfig: NextConfig = {
+  output: 'standalone',
+};
+```
+
+<Aside type="tip">
+  No special Next.js config is needed for REP to work in proxy mode — the gateway intercepts at the HTTP layer. The `output: 'standalone'` setting is just good practice for Docker deployments.
+</Aside>
+
+## Kubernetes (proxy mode)
+
+For Kubernetes, run gateway and Next.js as a two-container pod or two separate Deployments with a Service in front of the gateway:
+
+```yaml
+# Gateway reads config from a ConfigMap
+envFrom:
+  - configMapRef:
+      name: rep-config
+  - secretRef:
+      name: rep-secrets
+```
+
+See the [Kubernetes deployment guide](/deployment/kubernetes/) for a full manifest.

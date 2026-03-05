@@ -1,0 +1,129 @@
+# k8s/deployment.yaml
+#
+# Two deployment variants are shown here:
+#
+#   Variant A (envFrom) — Standard pattern. ConfigMap values become pod
+#   environment variables on startup. Requires a rolling restart to pick
+#   up ConfigMap changes.
+#
+#   Variant B (volume-mounted ConfigMap + hot reload) — Dynamic pattern.
+#   ConfigMap is mounted as a .env file. Gateway watches the file and
+#   pushes a reload event to connected browsers via SSE when it changes —
+#   no pod restart required. Annotate the ConfigMap with a hash to trigger
+#   rolling restarts for full-cycle failsafes.
+#
+# Use Variant A for simplicity; Variant B for zero-downtime flag changes.
+
+# ── Variant A: Standard envFrom ───────────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: default
+  labels:
+    app: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+        - name: gateway
+          image: your-registry/rep-nextjs-csr:latest
+          ports:
+            - containerPort: 8080
+          # Load all keys from ConfigMap as environment variables
+          envFrom:
+            - configMapRef:
+                name: rep-config
+            - secretRef:
+                name: rep-secrets
+          resources:
+            requests: { cpu: "10m", memory: "16Mi" }
+            limits:   { cpu: "100m", memory: "64Mi" }
+          livenessProbe:
+            httpGet: { path: /rep/health, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /rep/health, port: 8080 }
+            initialDelaySeconds: 2
+            periodSeconds: 5
+
+---
+
+# ── Variant B: Volume-mounted ConfigMap + hot reload (zero-downtime) ──────────
+#
+# How it works:
+#   1. ConfigMap is mounted as /config/rep.env inside the container
+#   2. Gateway starts with --env-file=/config/rep.env --hot-reload --hot-reload-mode=file_watch
+#   3. Kubernetes updates the mounted file within ~60s of a ConfigMap change
+#   4. Gateway detects the file change, re-reads vars, re-encrypts sensitive
+#      values, and pushes a reload event to all connected browsers via SSE
+#   5. Components using useRep() / rep.onChange() re-render automatically
+#
+# No pod restart required for feature flag changes.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-hotreload
+  namespace: default
+  labels:
+    app: frontend-hotreload
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend-hotreload
+  template:
+    metadata:
+      labels:
+        app: frontend-hotreload
+      annotations:
+        # Force a rolling restart when the ConfigMap content changes.
+        # Update this hash in CI/CD when applying a new ConfigMap version.
+        # kubectl get configmap rep-config -o jsonpath='{.data}' | sha256sum
+        rep-config-hash: "replace-with-configmap-data-sha256"
+    spec:
+      containers:
+        - name: gateway
+          image: your-registry/rep-nextjs-csr:latest
+          ports:
+            - containerPort: 8080
+          # Sensitive vars still come from a Secret (not the mounted file)
+          envFrom:
+            - secretRef:
+                name: rep-secrets
+          # Gateway reads public/config vars from the mounted env file
+          args:
+            - "--mode=embedded"
+            - "--static-dir=/static"
+            - "--env-file=/config/rep.env"
+            - "--hot-reload"
+            - "--hot-reload-mode=file_watch"
+            - "--watch-path=/config/rep.env"
+          volumeMounts:
+            - name: rep-config-volume
+              mountPath: /config
+              readOnly: true
+          resources:
+            requests: { cpu: "10m", memory: "16Mi" }
+            limits:   { cpu: "100m", memory: "64Mi" }
+          livenessProbe:
+            httpGet: { path: /rep/health, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet: { path: /rep/health, port: 8080 }
+            initialDelaySeconds: 2
+            periodSeconds: 5
+      volumes:
+        - name: rep-config-volume
+          configMap:
+            name: rep-config-envfile

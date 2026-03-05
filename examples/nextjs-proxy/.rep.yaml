@@ -1,0 +1,40 @@
+# .rep.yaml — REP manifest for the Next.js proxy example
+
+version: "0.1.0"
+
+variables:
+  API_URL:
+    tier: public
+    type: url
+    required: true
+    description: "Backend API base URL"
+    example: "https://api.example.com"
+
+  ENV_NAME:
+    tier: public
+    type: enum
+    required: true
+    values: ["development", "staging", "production"]
+    description: "Deployment environment name"
+
+  FEATURE_FLAGS:
+    tier: public
+    type: csv
+    required: false
+    default: ""
+    description: "Comma-separated active feature flags"
+    example: "dark-mode,new-checkout"
+
+  ANALYTICS_KEY:
+    tier: sensitive
+    type: string
+    required: false
+    description: "Analytics write key — encrypted in transit"
+    example: "ak_live_abc123"
+
+settings:
+  strict_guardrails: true
+  hot_reload: true
+  hot_reload_mode: signal
+  session_key_ttl: "30s"
+  session_key_max_rate: 10
