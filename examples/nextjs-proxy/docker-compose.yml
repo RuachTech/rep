@@ -9,7 +9,7 @@
 #
 # Usage:
 #   docker compose up
-#   docker compose up -e REP_PUBLIC_API_URL=https://api.prod.example.com
+#   REP_PUBLIC_API_URL=https://api.prod.example.com docker compose up
 #
 # Change config without rebuilding: update the environment block below,
 # then `docker compose up -d gateway` to restart only the gateway.

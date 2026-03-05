@@ -8,14 +8,11 @@
 #
 # For a full stack, use docker-compose.yml in this directory.
 
-FROM node:22-alpine AS deps
-WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
-
 FROM node:22-alpine AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json* ./
+# Install all deps (including devDependencies) — TypeScript is needed for the build
+RUN npm ci
 COPY . .
 RUN npm run build
 

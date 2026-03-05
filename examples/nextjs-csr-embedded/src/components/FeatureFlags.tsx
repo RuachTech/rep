@@ -23,7 +23,9 @@ export function FeatureFlags() {
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {ALL_FLAGS.map(flag => (
           <li key={flag} style={{ padding: '0.4rem 0', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span style={{ fontSize: '1.2rem' }}>{active.has(flag) ? '✅' : '⬜'}</span>
+            <span role="img" aria-label={active.has(flag) ? 'enabled' : 'disabled'} style={{ fontSize: '1.2rem' }}>
+              {active.has(flag) ? '✅' : '⬜'}
+            </span>
             <code>{flag}</code>
           </li>
         ))}

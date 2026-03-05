@@ -137,4 +137,4 @@ Same `index.html`. Same Docker image. Different runtime config.
 
 ## Security note
 
-The esm.sh `import` call happens in the browser after the page loads. For production, consider pinning the SDK version and adding an [import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap) or hosting the SDK on your own CDN to remove the esm.sh dependency. Adding an SRI hash on the import is also recommended.
+The esm.sh `import` call happens in the browser after the page loads. For production, consider pinning the SDK version and adding an [import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap) or hosting the SDK on your own CDN to remove the esm.sh dependency. If you self-host the SDK and load it via `<script type="module" src="...">`, you can add an `integrity` attribute for [Subresource Integrity (SRI)](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity) verification. Note that SRI works on `<script src>` / `<link>` tags, not on bare `import` statements inside a module.
