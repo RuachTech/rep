@@ -1,0 +1,47 @@
+# .rep.yaml — REP manifest for the Next.js CSR + embedded example
+
+version: "0.1.0"
+
+variables:
+  API_URL:
+    tier: public
+    type: url
+    required: true
+    description: "Backend API base URL"
+    example: "https://api.example.com"
+
+  ENV_NAME:
+    tier: public
+    type: enum
+    required: true
+    values: ["development", "staging", "production"]
+    description: "Deployment environment name"
+
+  FEATURE_FLAGS:
+    tier: public
+    type: csv
+    required: false
+    default: ""
+    description: "Comma-separated active feature flags — managed via Kubernetes ConfigMap"
+    example: "dark-mode,new-checkout,ai-assist"
+
+  APP_VERSION:
+    tier: public
+    type: string
+    required: false
+    default: "0.0.0"
+    description: "Application version (for display/debugging)"
+
+  ANALYTICS_KEY:
+    tier: sensitive
+    type: string
+    required: false
+    description: "Analytics write key — AES-256-GCM encrypted, stored in Kubernetes Secret"
+    example: "ak_live_abc123"
+
+settings:
+  strict_guardrails: true
+  hot_reload: true
+  hot_reload_mode: signal
+  session_key_ttl: "30s"
+  session_key_max_rate: 10

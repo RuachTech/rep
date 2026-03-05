@@ -1,0 +1,45 @@
+# .rep.yaml — REP manifest for the simple-html example
+# Optional. Run `rep validate` and `rep typegen` from this directory.
+
+version: "0.1.0"
+
+variables:
+  APP_TITLE:
+    tier: public
+    type: string
+    required: false
+    default: "REP Demo"
+    description: "Application title shown in the page heading and browser tab"
+
+  API_URL:
+    tier: public
+    type: url
+    required: true
+    description: "Backend API base URL"
+    example: "https://api.example.com"
+
+  ENV_NAME:
+    tier: public
+    type: enum
+    required: true
+    values: ["development", "staging", "production"]
+    description: "Deployment environment"
+
+  FEATURE_FLAGS:
+    tier: public
+    type: csv
+    required: false
+    default: ""
+    description: "Comma-separated list of active feature flags"
+    example: "dark-mode,beta"
+
+  ANALYTICS_KEY:
+    tier: sensitive
+    type: string
+    required: false
+    description: "Analytics write key — encrypted in transit, never visible in page source"
+    example: "ak_live_abc123"
+
+settings:
+  strict_guardrails: true
+  session_key_ttl: "30s"

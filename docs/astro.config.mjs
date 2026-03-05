@@ -144,6 +144,12 @@ export default defineConfig({
               slug: 'examples/quick-no-manifest',
             },
             { label: 'Todo App (React)', slug: 'examples/todo-react' },
+            { label: 'Simple HTML (ESM.sh)', slug: 'examples/simple-html' },
+            { label: 'Next.js — Proxy Mode', slug: 'examples/nextjs-proxy' },
+            {
+              label: 'Next.js CSR + Kubernetes',
+              slug: 'examples/nextjs-csr-kubernetes',
+            },
           ],
         },
         {

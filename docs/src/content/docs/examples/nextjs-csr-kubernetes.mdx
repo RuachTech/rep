@@ -1,0 +1,285 @@
+---
+title: Next.js CSR — Embedded Mode + Kubernetes
+description: Export Next.js as a static site, serve it with the REP gateway in embedded mode, and manage feature flags dynamically via a Kubernetes ConfigMap. Includes a hot-reload variant with zero pod restarts.
+---
+
+import { Aside, FileTree, Steps } from '@astrojs/starlight/components';
+
+Next.js with `output: 'export'` produces a fully static site. The REP gateway serves the output in **embedded mode** — no Node.js server needed in production. A Kubernetes ConfigMap holds all runtime config. Update it to change feature flags across all pods without rebuilding the image.
+
+Source code at [`examples/nextjs-csr-embedded/`](https://github.com/ruachtech/rep/tree/main/examples/nextjs-csr-embedded).
+
+## Architecture
+
+```
+Browser → REP Gateway :8080 (embedded mode)
+          │ serves /static (Next.js export)
+          │ injects __rep__ payload from environment vars
+          └ environment vars come from Kubernetes ConfigMap + Secret
+```
+
+No upstream server. No Node.js runtime in production. The final container is `FROM scratch`.
+
+## When to use this pattern
+
+- Next.js app with no server-side rendering requirements (pure CSR)
+- Kubernetes deployments where you want to change feature flags without rebuilds
+- Minimal container surface area (`FROM scratch`, ~8MB total image size)
+
+## File structure
+
+<FileTree>
+- examples/nextjs-csr-embedded/
+  - src/
+    - app/
+      - layout.tsx
+      - page.tsx
+    - components/
+      - ConfigPanel.tsx  Reads REP public + sensitive vars
+      - FeatureFlags.tsx  Hot-reload-aware flag toggle display
+  - k8s/
+    - configmap.yaml          Standard envFrom pattern
+    - configmap-envfile.yaml  Hot-reload variant (mounted as file)
+    - deployment.yaml         Both variants documented
+    - secret.yaml             Sensitive vars
+    - service.yaml + Ingress
+  - Dockerfile  3-stage: gateway + Next.js build + FROM scratch
+  - next.config.ts  output: 'export'
+  - .rep.yaml
+  - .env.example
+</FileTree>
+
+## Next.js static export
+
+Set `output: 'export'` in `next.config.ts`:
+
+```typescript
+const nextConfig: NextConfig = {
+  output: 'export',
+  images: { unoptimized: true },  // required for static export
+};
+```
+
+The build produces an `out/` directory of static HTML/CSS/JS. This is what the gateway serves.
+
+## Reading REP vars in client components
+
+```tsx
+'use client';
+
+import { useRep, useRepSecure } from '@rep-protocol/react';
+
+export function ConfigPanel() {
+  // Synchronous — available on first render
+  const apiUrl  = useRep('API_URL',  'http://localhost:3001');
+  const envName = useRep('ENV_NAME', 'development');
+
+  // Decrypted on demand (async)
+  const { value: analyticsKey, loading } = useRepSecure('ANALYTICS_KEY');
+
+  return (/* … */);
+}
+```
+
+```tsx
+'use client';
+
+import { useRep } from '@rep-protocol/react';
+
+export function FeatureFlags() {
+  // useRep() subscribes to hot reload — component re-renders
+  // when FEATURE_FLAGS changes without a page refresh
+  const rawFlags = useRep('FEATURE_FLAGS', '');
+  const active   = new Set(rawFlags.split(',').map(f => f.trim()).filter(Boolean));
+
+  return (
+    <ul>
+      {['dark-mode', 'new-checkout', 'ai-assist'].map(flag => (
+        <li key={flag}>{active.has(flag) ? '✅' : '⬜'} {flag}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+## Dockerfile (FROM scratch)
+
+Three stages: download gateway, build Next.js, assemble scratch image:
+
+```dockerfile
+FROM alpine:3.21 AS gateway
+ARG GATEWAY_VERSION=0.1.3
+RUN apk add --no-cache curl ca-certificates && \
+    curl -fsSL "…/rep-gateway_${GATEWAY_VERSION}_linux_amd64.tar.gz" \
+      | tar -xz -C /tmp && \
+    mv /tmp/rep-gateway /rep-gateway && chmod +x /rep-gateway
+
+FROM node:22-alpine AS builder
+WORKDIR /app
+COPY package.json package-lock.json* ./
+RUN npm ci
+COPY . .
+RUN npm run build   # produces out/
+
+FROM scratch
+COPY --from=gateway /rep-gateway /rep-gateway
+COPY --from=builder /app/out /static
+COPY --from=gateway /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+USER 65534:65534
+EXPOSE 8080
+ENTRYPOINT ["/rep-gateway", "--mode", "embedded", "--static-dir", "/static"]
+```
+
+## Kubernetes: ConfigMap for feature flags
+
+### Standard pattern (envFrom)
+
+Store all `REP_PUBLIC_*` vars in a ConfigMap. Sensitive vars go in a Secret:
+
+```yaml
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rep-config
+data:
+  REP_PUBLIC_API_URL: "https://api.example.com"
+  REP_PUBLIC_ENV_NAME: "production"
+  REP_PUBLIC_FEATURE_FLAGS: "dark-mode,new-checkout"   # ← update this to toggle flags
+  REP_GATEWAY_MODE: "embedded"
+  REP_GATEWAY_HOT_RELOAD: "true"
+```
+
+```yaml
+# secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rep-secrets
+stringData:
+  REP_SENSITIVE_ANALYTICS_KEY: "ak_live_replace_me"
+```
+
+Reference both in the Deployment:
+
+```yaml
+envFrom:
+  - configMapRef:
+      name: rep-config
+  - secretRef:
+      name: rep-secrets
+```
+
+To update feature flags:
+
+```bash
+kubectl edit configmap rep-config
+# Change REP_PUBLIC_FEATURE_FLAGS, save
+
+kubectl rollout restart deployment/frontend
+# New pods start with updated config
+```
+
+### Hot-reload variant (zero pod restarts)
+
+Mount the ConfigMap as a `.env` file and start the gateway with `--hot-reload --hot-reload-mode=file_watch`:
+
+<Steps>
+1. **Apply the env-file ConfigMap**
+
+   ```bash
+   kubectl apply -f k8s/configmap-envfile.yaml
+   ```
+
+   The ConfigMap stores a `.env` file as a single key:
+
+   ```yaml
+   data:
+     rep.env: |
+       REP_PUBLIC_API_URL=https://api.example.com
+       REP_PUBLIC_FEATURE_FLAGS=dark-mode,new-checkout
+   ```
+
+2. **Mount the file in the Deployment**
+
+   ```yaml
+   args:
+     - "--mode=embedded"
+     - "--static-dir=/static"
+     - "--env-file=/config/rep.env"
+     - "--hot-reload"
+     - "--hot-reload-mode=file_watch"
+     - "--watch-path=/config/rep.env"
+   volumeMounts:
+     - name: rep-config-volume
+       mountPath: /config
+       readOnly: true
+   volumes:
+     - name: rep-config-volume
+       configMap:
+         name: rep-config-envfile
+   ```
+
+3. **Update feature flags**
+
+   ```bash
+   kubectl edit configmap rep-config-envfile
+   # Change REP_PUBLIC_FEATURE_FLAGS in the rep.env block, save
+   ```
+
+4. **Wait ~60 seconds**
+
+   Kubernetes propagates ConfigMap changes to mounted files. The gateway detects the file change, re-reads vars, re-encrypts sensitive values with a fresh ephemeral key, and pushes a reload event to all connected browsers via `/rep/changes` (SSE).
+
+5. **Components re-render automatically**
+
+   Any component using `useRep('FEATURE_FLAGS')` re-renders with the new value. No pod restart, no page refresh.
+</Steps>
+
+<Aside type="note">
+  The hot-reload file-watch variant requires the gateway to be started with `--env-file` and `--watch-path` flags pointing to the mounted ConfigMap file. Sensitive vars still come from the `secretRef` (not the mounted file) since Secrets should not be mounted as env files.
+</Aside>
+
+## Running locally
+
+### Docker
+
+```bash
+cd examples/nextjs-csr-embedded
+
+docker build -t rep-nextjs-csr .
+
+docker run --rm -p 8080:8080 \
+  -e REP_PUBLIC_API_URL=https://api.example.com \
+  -e REP_PUBLIC_ENV_NAME=production \
+  -e REP_PUBLIC_FEATURE_FLAGS=dark-mode,new-checkout \
+  -e REP_SENSITIVE_ANALYTICS_KEY=ak_live_abc123 \
+  rep-nextjs-csr
+```
+
+### CLI dev mode
+
+```bash
+cd examples/nextjs-csr-embedded
+
+# Build the static export
+npm run build   # → out/
+
+# Serve with gateway in embedded mode
+npx @rep-protocol/cli dev \
+  --mode embedded \
+  --static-dir ./out \
+  --env-file .env.local
+```
+
+## Comparison: static vs SSR
+
+| | CSR + Embedded (this example) | SSR + Proxy |
+|---|---|---|
+| Next.js `output` | `'export'` (static) | default (server) |
+| Runtime container | `FROM scratch` (~8MB) | Node.js image (~150MB) |
+| Server features | ❌ No API routes, no SSR | ✅ Full Next.js server |
+| Feature flag updates | ConfigMap edit + SIGHUP (no restart) | ConfigMap edit + rolling restart |
+| Gateway mode | `embedded` | `proxy` |
+
+Use the CSR + embedded pattern when you don't need server-side rendering or Next.js API routes. Use the [proxy mode example](/examples/nextjs-proxy/) when you do.

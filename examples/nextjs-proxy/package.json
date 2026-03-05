@@ -1,0 +1,26 @@
+{
+  "name": "rep-nextjs-proxy-example",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "rep:validate": "rep validate",
+    "rep:typegen": "rep typegen --output src/rep.d.ts"
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@rep-protocol/sdk": "^0.1.8",
+    "@rep-protocol/react": "^0.1.8"
+  },
+  "devDependencies": {
+    "@rep-protocol/cli": "^0.1.8",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.4.0"
+  }
+}

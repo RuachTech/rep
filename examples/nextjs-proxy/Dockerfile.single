@@ -1,0 +1,75 @@
+# examples/nextjs-proxy/Dockerfile.single
+#
+# Single-container build — REP gateway (proxy) + Next.js server in one image.
+# Use this when you want a single pod/container for Kubernetes or any
+# environment where you can't (or don't want to) run two separate services.
+#
+#   Client → REP Gateway :8080 → Next.js :3000 (same container)
+#
+# For a two-service setup (recommended for separation of concerns), see
+# docker-compose.yml and the plain Dockerfile in this directory instead.
+#
+# Build:
+#   docker build -f Dockerfile.single -t rep-nextjs-proxy .
+#
+# Run:
+#   docker run --rm -p 8080:8080 \
+#     -e REP_PUBLIC_API_URL=https://api.example.com \
+#     -e REP_PUBLIC_ENV_NAME=production \
+#     -e REP_PUBLIC_FEATURE_FLAGS=dark-mode \
+#     -e REP_SENSITIVE_ANALYTICS_KEY=ak_live_abc123 \
+#     rep-nextjs-proxy
+#
+# Kubernetes: pass REP_PUBLIC_* from a ConfigMap and REP_SENSITIVE_* from a
+# Secret via envFrom. See examples/nextjs-csr-embedded/k8s/ for full manifests.
+
+# ── Stage 1: Download pre-built REP Gateway binary ────────────────────────────
+FROM alpine:3.21 AS gateway
+
+ARG GATEWAY_VERSION=0.1.3
+ARG TARGETARCH=amd64
+
+RUN apk add --no-cache curl ca-certificates && \
+    ARCHIVE="rep-gateway_${GATEWAY_VERSION}_linux_${TARGETARCH}.tar.gz" && \
+    curl -fsSL \
+      "https://github.com/RuachTech/rep/releases/download/gateway/v${GATEWAY_VERSION}/${ARCHIVE}" \
+      -o /tmp/gateway.tar.gz && \
+    tar -xzf /tmp/gateway.tar.gz -C /tmp && \
+    mv /tmp/rep-gateway /rep-gateway && \
+    chmod +x /rep-gateway
+
+# ── Stage 2: Build the Next.js application ────────────────────────────────────
+FROM node:22-alpine AS builder
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci
+
+COPY . .
+
+# Standalone output bundles the Next.js server into a self-contained directory.
+# Required for this pattern — update next.config.ts: output: 'standalone'
+RUN npm run build
+
+# ── Stage 3: Runtime image — Node.js + gateway in one container ───────────────
+FROM node:22-alpine AS runner
+WORKDIR /app
+
+# Gateway binary
+COPY --from=gateway /rep-gateway /usr/local/bin/rep-gateway
+
+# Next.js standalone build
+COPY --from=builder --chown=node:node /app/.next/standalone ./
+COPY --from=builder --chown=node:node /app/.next/static     ./.next/static
+COPY --from=builder --chown=node:node /app/public           ./public
+
+# Startup script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+USER node
+
+# Gateway is the public-facing port
+EXPOSE 8080
+
+ENTRYPOINT ["/docker-entrypoint.sh"]

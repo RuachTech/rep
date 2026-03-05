@@ -1,0 +1,52 @@
+# examples/nextjs-proxy/docker-compose.yml
+#
+# Two-service stack: REP gateway (proxy mode) + Next.js application server.
+#
+#   Client → REP Gateway :8080 → Next.js :3000
+#
+# The gateway intercepts HTML responses from Next.js and injects the
+# __rep__ payload before the browser receives them.
+#
+# Usage:
+#   docker compose up
+#   REP_PUBLIC_API_URL=https://api.prod.example.com docker compose up
+#
+# Change config without rebuilding: update the environment block below,
+# then `docker compose up -d gateway` to restart only the gateway.
+
+services:
+
+  # ── REP Gateway ──────────────────────────────────────────────────────────────
+  gateway:
+    image: ghcr.io/ruachtech/rep/gateway:0.1.3
+    ports:
+      - "8080:8080"
+    environment:
+      # Gateway config
+      REP_GATEWAY_MODE: proxy
+      REP_GATEWAY_PORT: "8080"
+      REP_GATEWAY_UPSTREAM: "app:3000"
+      REP_GATEWAY_HOT_RELOAD: "true"
+      REP_GATEWAY_HOT_RELOAD_MODE: signal
+      REP_GATEWAY_ALLOWED_ORIGINS: "http://localhost:8080"
+
+      # Application variables — change these per environment, not the Next.js image
+      REP_PUBLIC_API_URL: "http://localhost:3001"
+      REP_PUBLIC_ENV_NAME: "development"
+      REP_PUBLIC_FEATURE_FLAGS: "dark-mode"
+      REP_SENSITIVE_ANALYTICS_KEY: "ak_dev_replace_me"
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  # ── Next.js application ───────────────────────────────────────────────────────
+  app:
+    build: .
+    # Next.js server is NOT exposed externally — all traffic goes through the gateway
+    expose:
+      - "3000"
+    # No REP_PUBLIC_* vars here — they are injected by the gateway at request time,
+    # not embedded into the Next.js build.
+    environment:
+      NODE_ENV: production
+    restart: unless-stopped

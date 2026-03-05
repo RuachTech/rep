@@ -1,0 +1,140 @@
+---
+title: Simple HTML — No Build Step
+description: Use REP in a plain HTML file with no bundler or framework. The SDK is loaded via esm.sh and the gateway serves the file in embedded mode with a FROM scratch container.
+---
+
+import { Aside, FileTree } from '@astrojs/starlight/components';
+
+A single HTML file using the REP SDK via [esm.sh](https://esm.sh), served by the gateway in embedded mode. No build step, no bundler, no framework.
+
+Source code at [`examples/simple-html/`](https://github.com/ruachtech/rep/tree/main/examples/simple-html).
+
+## When to use this pattern
+
+- Static marketing pages or single-file dashboards
+- Quick prototyping without a build pipeline
+- Demonstrating REP concepts with minimal infrastructure
+- Environments where adding a Node.js build step is impractical
+
+## File structure
+
+<FileTree>
+- examples/simple-html/
+  - index.html  Single HTML file — the entire app
+  - Dockerfile  Two-stage: gateway download → FROM scratch
+  - .rep.yaml   Optional manifest for validate/typegen
+  - .env.example Template environment variables
+</FileTree>
+
+## How it works
+
+The REP gateway runs in **embedded mode**, serving `index.html` directly. When a browser requests the page, the gateway injects the `__rep__` payload before the response is sent:
+
+```
+Browser → REP Gateway :8080 (embedded mode)
+          ↓ injects <script id="__rep__" type="application/json">…</script>
+          ↓ serves index.html
+```
+
+The HTML file imports the SDK as an ES module from esm.sh — no npm install, no bundler:
+
+```html
+<script type="module">
+  import { rep } from 'https://esm.sh/@rep-protocol/sdk@0.1.8';
+
+  // Public vars — synchronous, available immediately
+  const apiUrl  = rep.get('API_URL', 'http://localhost:3001');
+  const envName = rep.get('ENV_NAME', 'development');
+
+  // Sensitive var — AES-256-GCM encrypted, decrypted on demand
+  const analyticsKey = await rep.getSecure('ANALYTICS_KEY');
+
+  // Hot reload — react to config changes pushed via SSE
+  rep.onChange('FEATURE_FLAGS', (next) => {
+    document.getElementById('features').textContent = next || '(none)';
+  });
+</script>
+```
+
+<Aside type="tip">
+  The `__rep__` script tag is injected **before** the browser parses `<script type="module">`, so `rep.get()` is synchronous and always returns a value — no loading state needed.
+</Aside>
+
+## Dockerfile
+
+A two-stage build. No app build step is needed — the HTML file is copied as-is:
+
+```dockerfile
+FROM alpine:3.21 AS gateway
+ARG GATEWAY_VERSION=0.1.3
+RUN apk add --no-cache curl ca-certificates && \
+    curl -fsSL "…/rep-gateway_${GATEWAY_VERSION}_linux_amd64.tar.gz" \
+      -o /tmp/gateway.tar.gz && \
+    tar -xzf /tmp/gateway.tar.gz -C /tmp && \
+    mv /tmp/rep-gateway /rep-gateway && \
+    chmod +x /rep-gateway
+
+FROM scratch
+COPY --from=gateway /rep-gateway /rep-gateway
+COPY index.html /static/index.html
+COPY --from=gateway /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+USER 65534:65534
+EXPOSE 8080
+ENTRYPOINT ["/rep-gateway", "--mode", "embedded", "--static-dir", "/static"]
+```
+
+The final image contains: gateway binary + one HTML file + CA certificates. Total size is approximately 6MB.
+
+## Running locally
+
+### Docker
+
+```bash
+cd examples/simple-html
+
+docker build -t rep-simple-html .
+
+docker run --rm -p 8080:8080 \
+  -e REP_PUBLIC_APP_TITLE="My App" \
+  -e REP_PUBLIC_API_URL=https://api.example.com \
+  -e REP_PUBLIC_ENV_NAME=production \
+  -e REP_PUBLIC_FEATURE_FLAGS=dark-mode,beta \
+  -e REP_SENSITIVE_ANALYTICS_KEY=ak_live_abc123 \
+  rep-simple-html
+```
+
+### Without Docker (CLI)
+
+```bash
+cd examples/simple-html
+
+# Serve the HTML file locally with the gateway
+npx @rep-protocol/cli dev \
+  --mode embedded \
+  --static-dir . \
+  --env-file .env.local
+```
+
+## Changing config
+
+No rebuild required. Stop, change env vars, restart:
+
+```bash
+# Production config
+docker run --rm -p 8080:8080 \
+  -e REP_PUBLIC_API_URL=https://api.prod.example.com \
+  -e REP_PUBLIC_FEATURE_FLAGS=dark-mode \
+  rep-simple-html
+
+# Staging config — same image
+docker run --rm -p 8080:8080 \
+  -e REP_PUBLIC_API_URL=https://api.staging.example.com \
+  -e REP_PUBLIC_FEATURE_FLAGS=dark-mode,beta,new-checkout \
+  rep-simple-html
+```
+
+Same `index.html`. Same Docker image. Different runtime config.
+
+## Security note
+
+The esm.sh `import` call happens in the browser after the page loads. For production, consider pinning the SDK version and adding an [import map](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/script/type/importmap) or hosting the SDK on your own CDN to remove the esm.sh dependency. If you self-host the SDK and load it via `<script type="module" src="...">`, you can add an `integrity` attribute for [Subresource Integrity (SRI)](https://developer.mozilla.org/en-US/docs/Web/Security/Subresource_Integrity) verification. Note that SRI works on `<script src>` / `<link>` tags, not on bare `import` statements inside a module.

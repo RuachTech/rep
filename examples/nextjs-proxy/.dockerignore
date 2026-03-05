@@ -1,0 +1,7 @@
+.next
+node_modules
+.env.local
+.env.*.local
+*.md
+.rep.yaml
+k8s/

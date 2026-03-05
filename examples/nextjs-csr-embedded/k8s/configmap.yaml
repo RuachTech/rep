@@ -1,0 +1,41 @@
+# k8s/configmap.yaml
+#
+# REP environment config — the single source of truth for all runtime variables.
+#
+# To update feature flags without rebuilding the app:
+#   1. kubectl edit configmap rep-config
+#      (or apply a modified version of this file)
+#   2. kubectl rollout restart deployment/frontend
+#      (pods pick up the new ConfigMap on restart)
+#
+# For zero-downtime flag changes without pod restarts, see the hot-reload
+# variant in deployment.yaml (volume-mounted ConfigMap + SIGHUP).
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rep-config
+  namespace: default
+  labels:
+    app: frontend
+    managed-by: rep-protocol
+data:
+  # ── PUBLIC TIER ────────────────────────────────────────────────────────────
+  # These values are injected as plaintext into the HTML payload.
+  # Safe to store in ConfigMap. Do NOT put secrets here.
+
+  REP_PUBLIC_API_URL: "https://api.example.com"
+  REP_PUBLIC_ENV_NAME: "production"
+
+  # Feature flags — update this value to toggle features across all pods.
+  # Comma-separated list of active flag names.
+  REP_PUBLIC_FEATURE_FLAGS: "dark-mode,new-checkout"
+
+  REP_PUBLIC_APP_VERSION: "1.0.0"
+
+  # ── GATEWAY CONFIG ─────────────────────────────────────────────────────────
+  REP_GATEWAY_MODE: "embedded"
+  REP_GATEWAY_PORT: "8080"
+  REP_GATEWAY_HOT_RELOAD: "true"
+  REP_GATEWAY_HOT_RELOAD_MODE: "signal"
+  REP_GATEWAY_ALLOWED_ORIGINS: "https://app.example.com"

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>REP — Simple HTML Example</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 4rem auto; padding: 0 1rem; }
+    pre  { background: #f4f4f4; padding: 1rem; border-radius: 6px; overflow-x: auto; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+    .badge-development { background: #fef3c7; color: #92400e; }
+    .badge-staging     { background: #dbeafe; color: #1e40af; }
+    .badge-production  { background: #dcfce7; color: #166534; }
+    .encrypted { color: #6b7280; font-style: italic; }
+    .row { display: flex; gap: 1rem; align-items: baseline; border-bottom: 1px solid #e5e7eb; padding: 0.5rem 0; }
+    .label { font-weight: 600; min-width: 160px; }
+    .integrity-banner { padding: 0.6rem 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.9rem; }
+    .integrity-ok      { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .integrity-fail    { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+    .integrity-unknown { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; }
+  </style>
+
+  <!--
+    REP SDK loaded via esm.sh — no build step required.
+    The gateway injects the __rep__ payload before this script runs,
+    so rep.get() is available synchronously.
+  -->
+  <script type="module">
+    import { rep } from 'https://esm.sh/@rep-protocol/sdk@0.1.8';
+
+    // ── PUBLIC vars — synchronous, available immediately ──────────────────────
+    const appTitle = rep.get('APP_TITLE', 'REP Demo');
+    const apiUrl   = rep.get('API_URL',   'http://localhost:3001');
+    const envName  = rep.get('ENV_NAME',  'development');
+    const features = rep.get('FEATURE_FLAGS', '');
+
+    document.title = appTitle;
+    document.getElementById('app-title').textContent = appTitle;
+    document.getElementById('api-url').textContent   = apiUrl;
+    document.getElementById('env-name').textContent  = envName;
+    document.getElementById('env-badge').className   = `badge badge-${envName}`;
+    document.getElementById('features').textContent  = features || '(none)';
+
+    // ── Payload metadata ──────────────────────────────────────────────────────
+    const meta = rep.meta();
+    if (meta) {
+      document.getElementById('injected-at').textContent = meta.injectedAt;
+      document.getElementById('rep-version').textContent = meta.version;
+    }
+
+    // ── Integrity verification ────────────────────────────────────────────────
+    // rep.verify() checks a SHA-256 SRI hash on the __rep__ script tag using
+    // the Web Crypto API. The gateway embeds this hash as data-rep-integrity.
+    // A false result means the payload JSON was modified after the gateway
+    // injected it — e.g., by a CDN caching a tampered response or a
+    // misconfigured proxy altering the response body.
+    //
+    // The underlying _verifySRI() check fires as a microtask during module
+    // init, so we await a resolved promise to let it settle before reading.
+    await Promise.resolve();
+
+    const banner = document.getElementById('integrity-banner');
+    if (!rep.meta()) {
+      // No REP payload present (e.g., running without the gateway)
+      banner.className = 'integrity-banner integrity-unknown';
+      banner.textContent = '⚪ Integrity: no REP payload detected (running without gateway?)';
+    } else if (rep.verify()) {
+      banner.className = 'integrity-banner integrity-ok';
+      banner.textContent = '✅ Integrity: payload verified — content matches the gateway-injected hash';
+    } else {
+      banner.className = 'integrity-banner integrity-fail';
+      banner.textContent = '🚨 Integrity check FAILED — payload may have been modified in transit. Do not trust these values.';
+      // In a real app you might refuse to render, redirect, or alert your monitoring.
+      console.error('[REP] Integrity check failed. Payload may have been tampered with.');
+    }
+
+    // ── SENSITIVE vars — AES-256-GCM encrypted, decrypted on demand ──────────
+    try {
+      const analyticsKey = await rep.getSecure('ANALYTICS_KEY');
+      document.getElementById('analytics-status').textContent =
+        analyticsKey ? `loaded (${analyticsKey.slice(0, 4)}…)` : 'not set';
+    } catch (err) {
+      document.getElementById('analytics-status').textContent = `error: ${err.message}`;
+    }
+
+    // ── Hot reload — listen for config changes pushed via SSE ─────────────────
+    rep.onChange('FEATURE_FLAGS', (next, prev) => {
+      document.getElementById('features').textContent = next || '(none)';
+      console.log(`[REP] FEATURE_FLAGS changed: "${prev}" → "${next}"`);
+    });
+  </script>
+</head>
+<body>
+
+  <div id="integrity-banner" class="integrity-banner integrity-unknown">⏳ Verifying payload integrity…</div>
+
+  <h1 id="app-title">Loading…</h1>
+  <p>
+    Environment: <span id="env-badge" class="badge"><span id="env-name">…</span></span>
+  </p>
+
+  <h2>Runtime Config</h2>
+  <div>
+    <div class="row"><span class="label">API_URL</span>       <code id="api-url"></code></div>
+    <div class="row"><span class="label">FEATURE_FLAGS</span> <code id="features"></code></div>
+    <div class="row"><span class="label">ANALYTICS_KEY</span> <span id="analytics-status" class="encrypted">decrypting…</span></div>
+  </div>
+
+  <h2>Payload Metadata</h2>
+  <div>
+    <div class="row"><span class="label">REP version</span>  <code id="rep-version"></code></div>
+    <div class="row"><span class="label">Injected at</span>  <code id="injected-at"></code></div>
+  </div>
+
+  <h2>About this example</h2>
+  <p>
+    This is a plain HTML file — no build step, no bundler, no framework.
+    The REP SDK is loaded directly from <a href="https://esm.sh">esm.sh</a>.
+    The gateway serves this file in <strong>embedded mode</strong> and injects
+    environment variables into the <code>&lt;script id="__rep__"&gt;</code> tag
+    before the browser receives it.
+  </p>
+  <pre>
+docker build -t rep-simple-html .
+docker run --rm -p 8080:8080 \
+  -e REP_PUBLIC_APP_TITLE="My App" \
+  -e REP_PUBLIC_API_URL=https://api.example.com \
+  -e REP_PUBLIC_ENV_NAME=production \
+  -e REP_PUBLIC_FEATURE_FLAGS=dark-mode,beta \
+  -e REP_SENSITIVE_ANALYTICS_KEY=ak_live_abc123 \
+  rep-simple-html
+  </pre>
+
+</body>
+</html>

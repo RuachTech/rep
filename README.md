@@ -295,6 +295,17 @@ REP is a formal, open specification — not just a tool.
 
 ---
 
+## Examples
+
+| Example | Pattern | Description |
+|---|---|---|
+| [`examples/todo-react/`](examples/todo-react/) | React + embedded | Full React todo app — `useRep()`, `useRepSecure()`, hot reload, `FROM scratch` Docker image |
+| [`examples/simple-html/`](examples/simple-html/) | Plain HTML + embedded | Single HTML file, SDK via esm.sh, no build step, `FROM scratch` image |
+| [`examples/nextjs-proxy/`](examples/nextjs-proxy/) | Next.js SSR + proxy | Next.js server behind the gateway in proxy mode; Docker Compose two-service setup |
+| [`examples/nextjs-csr-embedded/`](examples/nextjs-csr-embedded/) | Next.js CSR + embedded + Kubernetes | Static export served by gateway; ConfigMap-driven feature flags with hot-reload variant (zero pod restarts) |
+
+---
+
 ## Contributing
 
 We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, commit conventions, and the release process.

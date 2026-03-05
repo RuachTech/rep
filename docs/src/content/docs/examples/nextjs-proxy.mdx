@@ -1,0 +1,205 @@
+---
+title: Next.js — Proxy Mode
+description: Run the REP gateway as a reverse proxy in front of a Next.js SSR server. Environment variables are injected into every HTML response without touching the Next.js build.
+---
+
+import { Aside, FileTree, Tabs, TabItem } from '@astrojs/starlight/components';
+
+The REP gateway runs in **proxy mode** in front of a Next.js server. It intercepts every HTML response and injects the `__rep__` payload — no changes to the Next.js build pipeline required.
+
+Source code at [`examples/nextjs-proxy/`](https://github.com/ruachtech/rep/tree/main/examples/nextjs-proxy).
+
+## Architecture
+
+```
+Client → REP Gateway :8080 (proxy mode)
+              ↓ injects __rep__ payload into HTML responses
+         Next.js Server :3000
+```
+
+The Next.js server is never exposed directly. All traffic flows through the gateway. Config lives entirely in the gateway's environment variables — the Next.js image is the same across every deployment.
+
+## When to use this pattern
+
+- Next.js App Router or Pages Router with server-side rendering (SSR)
+- You want the full Next.js server (streaming, server actions, API routes)
+- Docker Compose, Kubernetes single-container pod, or multi-service deployments
+
+## File structure
+
+<FileTree>
+- examples/nextjs-proxy/
+  - src/
+    - app/
+      - layout.tsx
+      - page.tsx           Server component shell
+    - components/
+      - EnvDisplay.tsx     Client component — reads REP vars
+      - IntegrityBanner.tsx  Verifies payload was not modified in transit
+  - Dockerfile             Next.js-only image (for docker-compose)
+  - Dockerfile.single      Gateway + Next.js in one image (for Kubernetes)
+  - docker-compose.yml     Two-service stack (recommended)
+  - docker-entrypoint.sh   Startup script for Dockerfile.single
+  - next.config.ts
+  - .rep.yaml
+  - .env.example
+</FileTree>
+
+## Reading REP vars in Next.js
+
+REP runs entirely in the browser. In the App Router, use `'use client'` components:
+
+```tsx
+'use client';
+
+import { useRep, useRepSecure } from '@rep-protocol/react';
+
+export function EnvDisplay() {
+  // Synchronous — available on first render, no loading state
+  const apiUrl   = useRep('API_URL',  'http://localhost:3001');
+  const envName  = useRep('ENV_NAME', 'development');
+  const features = useRep('FEATURE_FLAGS', '');
+
+  // Async — decrypted via the session-key endpoint
+  const { value: analyticsKey, loading } = useRepSecure('ANALYTICS_KEY');
+
+  return (
+    <div>
+      <p>Environment: {envName}</p>
+      <p>API: {apiUrl}</p>
+      <p>Key: {loading ? 'loading…' : analyticsKey}</p>
+    </div>
+  );
+}
+```
+
+<Aside type="caution">
+  Do NOT call `rep.get()` in server components — the `__rep__` payload exists only in the browser DOM. REP vars are always accessed from `'use client'` components.
+</Aside>
+
+## Integrity verification
+
+The example includes an `IntegrityBanner` client component that verifies the payload was not modified after the gateway injected it. The SDK checks a SHA-256 SRI hash embedded on the `<script id="__rep__">` tag using the Web Crypto API. A mismatch means something (a CDN, a misconfigured proxy) altered the payload in transit.
+
+```tsx
+'use client';
+
+import { useEffect, useState } from 'react';
+import { rep } from '@rep-protocol/sdk';
+
+export function IntegrityBanner() {
+  const [ok, setOk] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // _verifySRI fires as a microtask during SDK init — await a tick first
+    Promise.resolve().then(() => setOk(rep.verify()));
+  }, []);
+
+  if (ok === null)  return <p>Verifying payload integrity…</p>;
+  if (ok)           return <p>✅ Payload integrity verified</p>;
+  return <p>🚨 Integrity check FAILED — payload may have been tampered with</p>;
+}
+```
+
+## Deployment options
+
+<Tabs>
+<TabItem label="Docker Compose (two services)">
+
+Recommended for development and multi-service production setups. Gateway and Next.js run as separate containers:
+
+```yaml
+services:
+  gateway:
+    image: ghcr.io/ruachtech/rep/gateway:0.1.3
+    ports:
+      - "8080:8080"
+    environment:
+      REP_GATEWAY_MODE: proxy
+      REP_GATEWAY_UPSTREAM: "app:3000"
+      REP_PUBLIC_API_URL: "https://api.example.com"
+      REP_PUBLIC_ENV_NAME: "production"
+      REP_PUBLIC_FEATURE_FLAGS: "dark-mode"
+      REP_SENSITIVE_ANALYTICS_KEY: "ak_live_abc123"
+    depends_on:
+      - app
+
+  app:
+    build: .
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+    # No REP_PUBLIC_* vars here — gateway injects them at request time
+```
+
+```bash
+cd examples/nextjs-proxy
+docker compose up
+```
+
+To change config without rebuilding:
+
+```bash
+# Edit REP_PUBLIC_* in docker-compose.yml, then:
+docker compose up -d gateway   # restart only the gateway
+```
+
+</TabItem>
+<TabItem label="Single container (Kubernetes)">
+
+`Dockerfile.single` packages the gateway and Next.js server into one image. A startup script (`docker-entrypoint.sh`) launches both processes:
+
+```sh
+#!/bin/sh
+# Start Next.js in the background
+NODE_ENV=production node /app/server.js &
+
+# REP gateway in the foreground (proxy → localhost:3000)
+exec rep-gateway --mode proxy --port 8080 --upstream localhost:3000
+```
+
+Build and run:
+
+```bash
+docker build -f Dockerfile.single -t rep-nextjs-proxy .
+
+docker run --rm -p 8080:8080 \
+  -e REP_PUBLIC_API_URL=https://api.example.com \
+  -e REP_PUBLIC_ENV_NAME=production \
+  -e REP_PUBLIC_FEATURE_FLAGS=dark-mode \
+  -e REP_SENSITIVE_ANALYTICS_KEY=ak_live_abc123 \
+  rep-nextjs-proxy
+```
+
+**Kubernetes** — pass config from a ConfigMap + Secret:
+
+```yaml
+containers:
+  - name: frontend
+    image: your-registry/rep-nextjs-proxy:latest
+    ports:
+      - containerPort: 8080
+    envFrom:
+      - configMapRef:
+          name: rep-config      # REP_PUBLIC_* and REP_GATEWAY_*
+      - secretRef:
+          name: rep-secrets     # REP_SENSITIVE_*
+```
+
+See [`examples/nextjs-csr-embedded/k8s/`](https://github.com/ruachtech/rep/tree/main/examples/nextjs-csr-embedded/k8s) for complete Kubernetes manifests including Service and Ingress.
+
+</TabItem>
+</Tabs>
+
+## CLI dev mode (no Docker)
+
+```bash
+# Terminal 1 — run Next.js dev server
+npm run dev   # starts on :3000
+
+# Terminal 2 — run REP gateway in proxy mode
+npx @rep-protocol/cli dev --proxy http://localhost:3000 --env-file .env.local
+```
+
+Open `http://localhost:8080`.
