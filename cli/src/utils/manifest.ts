@@ -47,8 +47,8 @@ function getSchemaValidator(): ValidateFunction {
     return schemaValidator;
   }
 
-  // Load schema from the repo root
-  const schemaPath = path.join(__dirname, '../../../schema/rep-manifest.schema.json');
+  // Load schema bundled with the CLI package
+  const schemaPath = path.join(__dirname, '../../schema/rep-manifest.schema.json');
   
   if (!fs.existsSync(schemaPath)) {
     throw new Error(`Schema file not found at ${schemaPath}`);

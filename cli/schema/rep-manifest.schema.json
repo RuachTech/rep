@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rep-protocol.dev/schema/rep-manifest.schema.json",
+  "title": "REP Manifest (.rep.yaml)",
+  "description": "JSON schema for the Runtime Environment Protocol manifest file. Declares expected variables, types, defaults, and gateway settings.",
+  "type": "object",
+  "required": ["version", "variables"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "REP protocol version this manifest targets.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "examples": ["0.1.0"]
+    },
+    "variables": {
+      "type": "object",
+      "description": "Map of variable names (without REP_ prefix) to their declarations.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["tier"],
+        "additionalProperties": false,
+        "properties": {
+          "tier": {
+            "type": "string",
+            "description": "Security classification tier.",
+            "enum": ["public", "sensitive", "server"]
+          },
+          "type": {
+            "type": "string",
+            "description": "Value type for validation.",
+            "enum": ["string", "url", "number", "boolean", "csv", "json", "enum"],
+            "default": "string"
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Whether this variable must be present at gateway startup.",
+            "default": false
+          },
+          "default": {
+            "type": "string",
+            "description": "Default value if the environment variable is not set. Only valid for non-required variables."
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the variable's purpose."
+          },
+          "example": {
+            "type": "string",
+            "description": "Example value for documentation."
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Regular expression pattern the value must match. Only applicable for string and sensitive types."
+          },
+          "values": {
+            "type": "array",
+            "description": "Allowed values for enum type.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "deprecated": {
+            "type": "boolean",
+            "description": "Marks the variable as deprecated. The gateway will log a warning if it is present.",
+            "default": false
+          },
+          "deprecated_message": {
+            "type": "string",
+            "description": "Migration guidance for deprecated variables."
+          }
+        }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "description": "Gateway configuration settings. These can be overridden by command-line flags and environment variables.",
+      "additionalProperties": false,
+      "properties": {
+        "strict_guardrails": {
+          "type": "boolean",
+          "description": "If true, guardrail warnings cause the gateway to exit. Recommended for production.",
+          "default": false
+        },
+        "hot_reload": {
+          "type": "boolean",
+          "description": "Enable the hot reload SSE endpoint.",
+          "default": false
+        },
+        "hot_reload_mode": {
+          "type": "string",
+          "description": "How the gateway detects configuration changes.",
+          "enum": ["file_watch", "signal", "poll"],
+          "default": "signal"
+        },
+        "hot_reload_poll_interval": {
+          "type": "string",
+          "description": "Poll interval for the poll hot reload mode. Go duration format.",
+          "pattern": "^\\d+[smh]$",
+          "default": "30s",
+          "examples": ["10s", "1m", "5m"]
+        },
+        "session_key_ttl": {
+          "type": "string",
+          "description": "Time-to-live for session decryption keys.",
+          "pattern": "^\\d+[smh]$",
+          "default": "30s"
+        },
+        "session_key_max_rate": {
+          "type": "integer",
+          "description": "Maximum session key requests per minute per client IP.",
+          "minimum": 1,
+          "default": 10
+        },
+        "allowed_origins": {
+          "type": "array",
+          "description": "CORS allowed origins for the session key endpoint. If empty, same-origin only.",
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    }
+  }
+}
