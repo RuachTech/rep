@@ -77,19 +77,23 @@ function generateTypeDefinition(publicVars: string[], sensitiveVars: string[]): 
   lines.push('  export interface REP {');
   lines.push('    /**');
   lines.push('     * Get a PUBLIC tier variable value synchronously.');
+  lines.push('     * When called with a defaultValue the return type narrows to string.');
   lines.push('     */');
-  
+
   if (publicVars.length > 0) {
-    lines.push('    get(key: ' + publicVars.map(v => `"${v}"`).join(' | ') + '): string | undefined;');
+    const keyUnion = publicVars.map(v => `"${v}"`).join(' | ');
+    lines.push('    get(key: ' + keyUnion + ', defaultValue: string): string;');
+    lines.push('    get(key: ' + keyUnion + ', defaultValue?: undefined): string | undefined;');
   } else {
-    lines.push('    get(key: string): string | undefined;');
+    lines.push('    get(key: string, defaultValue: string): string;');
+    lines.push('    get(key: string, defaultValue?: undefined): string | undefined;');
   }
-  
+
   lines.push('');
   lines.push('    /**');
   lines.push('     * Get a SENSITIVE tier variable value asynchronously.');
   lines.push('     */');
-  
+
   if (sensitiveVars.length > 0) {
     lines.push('    getSecure(key: ' + sensitiveVars.map(v => `"${v}"`).join(' | ') + '): Promise<string>;');
   } else {
@@ -131,8 +135,21 @@ function generateTypeDefinition(publicVars: string[], sensitiveVars: string[]): 
   lines.push('  }');
   lines.push('');
   lines.push('  export const rep: REP;');
-  lines.push('  export function get(key: string): string | undefined;');
-  lines.push('  export function getSecure(key: string): Promise<string>;');
+
+  if (publicVars.length > 0) {
+    const keyUnion = publicVars.map(v => `"${v}"`).join(' | ');
+    lines.push('  export function get(key: ' + keyUnion + ', defaultValue: string): string;');
+    lines.push('  export function get(key: ' + keyUnion + ', defaultValue?: undefined): string | undefined;');
+  } else {
+    lines.push('  export function get(key: string, defaultValue: string): string;');
+    lines.push('  export function get(key: string, defaultValue?: undefined): string | undefined;');
+  }
+
+  if (sensitiveVars.length > 0) {
+    lines.push('  export function getSecure(key: ' + sensitiveVars.map(v => `"${v}"`).join(' | ') + '): Promise<string>;');
+  } else {
+    lines.push('  export function getSecure(key: string): Promise<string>;');
+  }
   lines.push('  export function getAll(): Readonly<Record<string, string>>;');
   lines.push('  export function onChange(key: string, callback: (newValue: string, oldValue: string | undefined) => void): () => void;');
   lines.push('  export function onAnyChange(callback: (key: string, newValue: string, oldValue: string | undefined) => void): () => void;');

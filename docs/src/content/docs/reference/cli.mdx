@@ -50,12 +50,22 @@ rep typegen [--manifest <path>] [--output <path>]
 ```typescript
 declare module "@rep-protocol/sdk" {
   export interface REP {
-    get(key: "API_URL" | "FEATURE_FLAGS"): string | undefined;
+    // Overloaded: passing a defaultValue narrows the return type to string.
+    get(key: "API_URL" | "FEATURE_FLAGS", defaultValue: string): string;
+    get(key: "API_URL" | "FEATURE_FLAGS", defaultValue?: undefined): string | undefined;
     getSecure(key: "ANALYTICS_KEY"): Promise<string>;
     // ... other methods
   }
+  export function get(key: "API_URL" | "FEATURE_FLAGS", defaultValue: string): string;
+  export function get(key: "API_URL" | "FEATURE_FLAGS", defaultValue?: undefined): string | undefined;
+  export function getSecure(key: "ANALYTICS_KEY"): Promise<string>;
+  // ...
 }
 ```
+
+**Strict by design** — the key unions are closed. Calling `rep.get('UNDECLARED_KEY')` is a TypeScript error if that variable is not declared in `.rep.yaml`. This is intentional: it forces every variable the app reads to be explicitly declared in the manifest, keeping the manifest the single source of truth. The fix is always to add the missing variable to `.rep.yaml` and re-run `rep typegen`, not to widen the types.
+
+If you don't want strict type enforcement, skip `rep typegen` and rely on the base SDK types (`key: string`).
 
 ## `rep lint`
 
