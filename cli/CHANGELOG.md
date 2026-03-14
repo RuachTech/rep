@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/RuachTech/rep/compare/cli-v0.1.8...cli-v0.1.9) (2026-03-14)
+
+
+### Bug Fixes
+
+* **cli:** add defaultValue overloads and typed key unions to typegen output ([#27](https://github.com/RuachTech/rep/issues/27)) ([97e372c](https://github.com/RuachTech/rep/commit/97e372cfb8ad7e838e9f0406bc263280662bd915))
+
 ## [0.1.8](https://github.com/RuachTech/rep/compare/cli-v0.1.7...cli-v0.1.8) (2026-03-05)
 
 
