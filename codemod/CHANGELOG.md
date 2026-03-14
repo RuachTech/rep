@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.10](https://github.com/RuachTech/rep/compare/codemod-v0.1.9...codemod-v0.1.10) (2026-03-14)
+
+
+### Features
+
+* add rep skill ([#29](https://github.com/RuachTech/rep/issues/29)) ([31814ce](https://github.com/RuachTech/rep/commit/31814ce6712b64fc139c7e79338e207e93577757))
+
 ## [0.1.9](https://github.com/RuachTech/rep/compare/codemod-v0.1.8...codemod-v0.1.9) (2026-03-14)
 
 
