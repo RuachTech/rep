@@ -1,0 +1,839 @@
+# Instincts generated from https://github.com/RuachTech/rep
+# Generated: 2026-03-14T23:39:24.168Z
+# Version: 2.0
+
+---
+id: rep-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: feat, chore, fix
+
+## Evidence
+
+- 68 commits analyzed
+- Detected conventional commit pattern
+- Examples: chore(main): release, fix(cli): add defaultValue overloads and typed key unions to typegen output (#27)
+
+---
+id: rep-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Commit Length
+
+## Action
+
+Write moderate-length commit messages (~50 characters)
+
+## Evidence
+
+- Average commit message length: 68 chars
+- Based on 68 commits
+
+---
+id: rep-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Naming Files
+
+## Action
+
+Use camelCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: camelCase
+
+---
+id: rep-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: rep-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: rep-arch-type-based
+trigger: "when adding new code"
+confidence: 0.8
+domain: architecture
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Arch Type Based
+
+## Action
+
+Place code in the appropriate type folder (components/, services/, utils/, etc.)
+
+## Evidence
+
+- Type-based module organization detected
+- Folders: 
+
+---
+id: rep-test-framework
+trigger: "when writing tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Test Framework
+
+## Action
+
+Use vitest as the test framework
+
+## Evidence
+
+- Test framework detected: vitest
+- File pattern: *.test.ts
+
+---
+id: rep-test-naming
+trigger: "when creating a test file"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Test Naming
+
+## Action
+
+Name test files using the pattern: *.test.ts
+
+## Evidence
+
+- File pattern: *.test.ts
+- Consistent across test files
+
+---
+id: rep-test-mocking
+trigger: "when mocking dependencies in tests"
+confidence: 0.75
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Test Mocking
+
+## Action
+
+Use vi.mock for mocking
+
+## Evidence
+
+- Mocking pattern detected: vi.mock
+- Consistent across test files
+
+---
+id: rep-test-types
+trigger: "when planning tests for a feature"
+confidence: 0.7
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Test Types
+
+## Action
+
+Write unit, integration tests to match project standards
+
+## Evidence
+
+- Test types detected: unit, integration
+- Coverage config: no
+
+---
+id: rep-workflow-database-migration
+trigger: "when modifying the database schema or adding tables"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Workflow Database Migration
+
+## Action
+
+Follow the database-migration workflow:
+1. Create migration file
+2. Update schema definitions
+3. Generate/update types
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: **/schema.*, migrations/*
+
+---
+id: rep-workflow-feature-development
+trigger: "when implementing a new feature"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Workflow Feature Development
+
+## Action
+
+Follow the feature-development workflow:
+1. Add feature implementation
+2. Add tests for feature
+3. Update documentation
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~14x per month
+- Files: examples/todo-react/src/components/*, cli/src/commands/*, docs/.astro/*
+
+---
+id: rep-workflow-test-driven-development
+trigger: "when adding new functionality"
+confidence: 0.65
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Workflow Test Driven Development
+
+## Action
+
+Follow the test-driven-development workflow:
+1. Write failing test
+2. Implement code to pass test
+3. Refactor if needed
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~3x per month
+- Files: **/*.test.*, **/*.spec.*, src/**/*
+
+---
+id: rep-workflow-refactoring
+trigger: "when refactoring code"
+confidence: 0.6
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Workflow Refactoring
+
+## Action
+
+Follow the refactoring workflow:
+1. Ensure tests pass before refactor
+2. Refactor code structure
+3. Verify tests still pass
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~2x per month
+- Files: src/**/*
+
+---
+id: rep-workflow-automated-release
+trigger: "when doing automated release"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Workflow Automated Release
+
+## Action
+
+Follow the automated-release workflow:
+1. Update .release-please-manifest.json
+2. Generate/update CHANGELOG.md files for each package
+3. Bump version in package.json files
+4. Commit changes with 'chore(main): release' message
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~8x per month
+- Files: .release-please-manifest.json, */CHANGELOG.md, */package.json
+
+---
+id: rep-workflow-ci-workflow-optimization
+trigger: "when doing ci workflow optimization"
+confidence: 0.8
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Workflow Ci Workflow Optimization
+
+## Action
+
+Follow the ci-workflow-optimization workflow:
+1. Modify workflow trigger conditions
+2. Update job dependencies and conditions
+3. Add or modify workflow steps
+4. Update branch targeting or event triggers
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~6x per month
+- Files: .github/workflows/*.yml
+
+---
+id: rep-workflow-documentation-update
+trigger: "when doing documentation update"
+confidence: 0.65
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Workflow Documentation Update
+
+## Action
+
+Follow the documentation-update workflow:
+1. Update multiple .mdx files in docs/src/content/
+2. Modify astro.config.mjs if needed
+3. Update meta tags, titles, descriptions
+4. Regenerate content modules and data store
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~3x per month
+- Files: docs/src/content/docs/**/*.mdx, docs/astro.config.mjs, docs/.astro/*
+
+---
+id: rep-workflow-package-dependency-update
+trigger: "when doing package dependency update"
+confidence: 0.7
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Workflow Package Dependency Update
+
+## Action
+
+Follow the package-dependency-update workflow:
+1. Update package.json files with new versions
+2. Regenerate pnpm-lock.yaml
+3. Update cross-package dependencies
+4. Test compatibility
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~4x per month
+- Files: */package.json, pnpm-lock.yaml, examples/*/package.json
+
+---
+id: rep-workflow-cli-feature-enhancement
+trigger: "when doing cli feature enhancement"
+confidence: 0.65
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Workflow Cli Feature Enhancement
+
+## Action
+
+Follow the cli-feature-enhancement workflow:
+1. Modify CLI source files in cli/src/
+2. Update or add tests
+3. Update CLI documentation
+4. Update related configuration files
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~3x per month
+- Files: cli/src/**/*.ts, cli/src/**/__tests__/*.ts, docs/src/content/docs/reference/cli.mdx
+
+---
+id: rep-workflow-gateway-configuration-update
+trigger: "when doing gateway configuration update"
+confidence: 0.7
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/RuachTech/rep
+---
+
+# Rep Workflow Gateway Configuration Update
+
+## Action
+
+Follow the gateway-configuration-update workflow:
+1. Update gateway version references
+2. Modify postinstall scripts
+3. Update Docker configurations
+4. Update CLI gateway integration
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~4x per month
+- Files: cli/scripts/postinstall.js, cli/package.json, */Dockerfile
+
+---
+id: rep-camelcase-files
+trigger: "When creating new TypeScript files"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Camelcase Files
+
+## Action
+
+Use camelCase naming convention for file names
+
+## Evidence
+
+- Pattern in files like postinstall.js
+- Consistent across adapters/react/, cli/src/
+
+---
+id: rep-pascalcase-classes
+trigger: "When defining class names"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Pascalcase Classes
+
+## Action
+
+Use PascalCase naming convention for class names
+
+## Evidence
+
+- Pattern detected in codeStyle analysis
+- Consistent TypeScript conventions
+
+---
+id: rep-screaming-snake-constants
+trigger: "When defining constants"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Screaming Snake Constants
+
+## Action
+
+Use SCREAMING_SNAKE_CASE naming convention for constants
+
+## Evidence
+
+- Pattern detected in codeStyle analysis
+- TypeScript best practices
+
+---
+id: rep-relative-imports
+trigger: "When importing modules within the same package"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Relative Imports
+
+## Action
+
+Use relative import paths
+
+## Evidence
+
+- importStyle: relative in codeStyle
+- Consistent across monorepo structure
+
+---
+id: rep-named-exports
+trigger: "When exporting functions or classes"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Named Exports
+
+## Action
+
+Use named exports instead of default exports
+
+## Evidence
+
+- exportStyle: named in codeStyle
+- Pattern across TypeScript files
+
+---
+id: rep-vitest-framework
+trigger: "When writing tests"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Vitest Framework
+
+## Action
+
+Use vitest framework with *.test.ts file pattern
+
+## Evidence
+
+- vitest.config.ts in multiple packages
+- *.test.ts pattern in testing config
+
+---
+id: rep-vi-mock-style
+trigger: "When mocking in tests"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Vi Mock Style
+
+## Action
+
+Use vi.mock() for mocking dependencies
+
+## Evidence
+
+- mockingStyle: vi.mock in testing config
+- Vitest standard practice
+
+---
+id: rep-unit-integration-tests
+trigger: "When designing test coverage"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Unit Integration Tests
+
+## Action
+
+Write both unit and integration tests
+
+## Evidence
+
+- testTypes: unit, integration in config
+- Pattern in gateway/internal/inject/inject_test.go
+
+---
+id: rep-conventional-commits
+trigger: "When making commits"
+confidence: 0.95
+domain: git
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Conventional Commits
+
+## Action
+
+Use conventional commit format with feat/fix/chore prefixes
+
+## Evidence
+
+- feat(examples): add simple-html
+- fix(cli): add defaultValue overloads
+- chore(main): release
+
+---
+id: rep-scope-in-commits
+trigger: "When committing changes to specific packages"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Scope In Commits
+
+## Action
+
+Include package scope in commit message like (cli), (main), (examples)
+
+## Evidence
+
+- fix(cli): bundle schema
+- feat(examples): add simple-html
+- chore(main): release
+
+---
+id: rep-commit-length-68
+trigger: "When writing commit messages"
+confidence: 0.75
+domain: git
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Commit Length 68
+
+## Action
+
+Keep commit message length around 68 characters on average
+
+## Evidence
+
+- averageLength: 68 in commits analysis
+- Consistent across commit examples
+
+---
+id: rep-automated-release-workflow
+trigger: "When release-please bot creates a release commit"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Automated Release Workflow
+
+## Action
+
+Update .release-please-manifest.json, generate CHANGELOGs, and bump package.json versions
+
+## Evidence
+
+- chore(main): release commits
+- 8x/month frequency
+- .release-please-manifest.json updates
+
+---
+id: rep-ci-workflow-optimization
+trigger: "When optimizing build processes or fixing workflow issues"
+confidence: 0.88
+domain: workflow
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Ci Workflow Optimization
+
+## Action
+
+Modify .github/workflows/*.yml files with updated trigger conditions and job dependencies
+
+## Evidence
+
+- 6x/month frequency
+- .github/workflows/ file changes
+- CI optimization patterns
+
+---
+id: rep-documentation-comprehensive-update
+trigger: "When updating documentation content or SEO"
+confidence: 0.92
+domain: workflow
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Documentation Comprehensive Update
+
+## Action
+
+Update multiple .mdx files and regenerate astro content modules and data store
+
+## Evidence
+
+- docs: rewrite README for adopters and SEO-optimize
+- docs/.astro/ file changes
+- 3x/month frequency
+
+---
+id: rep-monorepo-dependency-update
+trigger: "When updating dependencies across packages"
+confidence: 0.87
+domain: workflow
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Monorepo Dependency Update
+
+## Action
+
+Update all package.json files and regenerate pnpm-lock.yaml for workspace consistency
+
+## Evidence
+
+- Multiple package.json updates
+- pnpm-lock.yaml changes
+- 4x/month frequency
+
+---
+id: rep-cli-enhancement-with-tests
+trigger: "When implementing new CLI commands or fixes"
+confidence: 0.83
+domain: workflow
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Cli Enhancement With Tests
+
+## Action
+
+Modify cli/src/ files, add corresponding tests, and update CLI documentation
+
+## Evidence
+
+- fix(cli): add defaultValue overloads
+- cli/src/**/*.ts changes
+- 3x/month frequency
+
+---
+id: rep-gateway-version-sync
+trigger: "When updating gateway versions or configurations"
+confidence: 0.86
+domain: workflow
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Gateway Version Sync
+
+## Action
+
+Update postinstall scripts, Docker configurations, and CLI gateway integration
+
+## Evidence
+
+- cli/scripts/postinstall.js changes
+- Dockerfile updates
+- 4x/month frequency
+
+---
+id: rep-try-catch-errors
+trigger: "When handling errors in code"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Try Catch Errors
+
+## Action
+
+Use try-catch blocks for error handling
+
+## Evidence
+
+- errorHandling.style: try-catch
+- No custom error classes detected
+
+---
+id: rep-type-based-modules
+trigger: "When organizing code modules"
+confidence: 0.9
+domain: architecture
+source: repo-analysis
+source_repo: RuachTech/rep
+---
+
+# Rep Type Based Modules
+
+## Action
+
+Organize modules by type rather than feature (adapters/, cli/, sdk/, etc.)
+
+## Evidence
+
+- moduleOrganization: type-based
+- Folder structure with adapters/, cli/, sdk/
+
