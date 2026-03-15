@@ -487,17 +487,38 @@ func (s *Server) createFileServer() http.Handler {
 
 	fs := http.FileServer(http.Dir(absDir))
 
-	// Wrap with SPA fallback: if a file is not found, serve index.html.
+	// SPA-aware static file handler, equivalent to:
+	//   nginx: try_files $uri $uri/ /index.html;
+	//
+	// 1. Root and static assets (paths with a file extension) are served
+	//    directly — this covers /, /_next/*, /assets/*, favicon.ico, etc.
+	// 2. For extension-less paths (likely application routes), we check
+	//    whether the filesystem has a matching directory with an index.html.
+	//    This lets frameworks that emit per-route directories (Next.js with
+	//    trailingSlash, Gatsby, Hugo, etc.) serve pre-rendered pages.
+	// 3. Otherwise, fall back to the root index.html and let the client-side
+	//    router resolve the path — the standard SPA pattern.
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Try to serve the file directly.
-		// For SPA routing, we want to serve index.html for non-file paths.
 		path := r.URL.Path
+
+		// Fast path: root and static assets are always served directly.
 		if path == "/" || filepath.Ext(path) != "" {
 			fs.ServeHTTP(w, r)
 			return
 		}
 
-		// For paths without extensions (likely SPA routes), serve index.html.
+		// Check whether the filesystem can satisfy this route directly
+		// (e.g. a directory containing index.html for pre-rendered pages).
+		clean := filepath.Join(absDir, filepath.Clean(path))
+		if info, err := os.Stat(clean); err == nil && info.IsDir() {
+			if _, err := os.Stat(filepath.Join(clean, "index.html")); err == nil {
+				fs.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		// SPA fallback: serve root index.html and let the client-side
+		// router resolve the path.
 		r.URL.Path = "/"
 		fs.ServeHTTP(w, r)
 	})
