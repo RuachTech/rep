@@ -170,7 +170,7 @@ make build
 cp bin/rep-gateway ../cli/bin/gateway/
 
 # Option 2: Download manually
-curl -fsSL https://github.com/RuachTech/rep/releases/download/gateway/v0.1.2/rep-gateway_0.1.2_linux_amd64.tar.gz | tar -xz
+curl -fsSL https://github.com/RuachTech/rep/releases/download/gateway/v0.1.4/rep-gateway_0.1.4_linux_amd64.tar.gz | tar -xz
 mv rep-gateway /usr/local/bin/
 ```
 
