@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -191,6 +193,176 @@ func TestServer_NoSessionKeyWithoutSensitive(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", resp.StatusCode)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// createFileServer / SPA-fallback tests
+// ---------------------------------------------------------------------------
+
+// newFileServerHandler constructs the SPA-aware file server handler from
+// createFileServer using only the staticDir — no crypto, no injection, no
+// payload. This isolates routing logic from the rest of the gateway stack.
+func newFileServerHandler(t *testing.T, staticDir string) http.Handler {
+	t.Helper()
+	s := &Server{
+		cfg:    &config.Config{StaticDir: staticDir},
+		logger: slog.Default(),
+	}
+	return s.createFileServer()
+}
+
+func TestFileServer_RootServesIndexHTML(t *testing.T) {
+	handler := newFileServerHandler(t, "../../testdata/static")
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /: expected 200, got %d", rec.Code)
+	}
+	if !containsStr(rec.Body.String(), "REP Gateway Test") {
+		t.Error("GET /: expected root index.html content")
+	}
+}
+
+func TestFileServer_StaticAssetServedDirectly(t *testing.T) {
+	// Requests with a file extension should be served as-is from disk.
+	handler := newFileServerHandler(t, "../../testdata/static")
+
+	req := httptest.NewRequest(http.MethodGet, "/style.css", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /style.css: expected 200, got %d", rec.Code)
+	}
+	if !containsStr(rec.Body.String(), "color") {
+		t.Error("GET /style.css: expected CSS content")
+	}
+}
+
+func TestFileServer_PrerenderedDirWithTrailingSlash(t *testing.T) {
+	// A directory containing index.html (e.g. Next.js trailingSlash, Gatsby)
+	// should serve that page directly, not the root index.html.
+	handler := newFileServerHandler(t, "../../testdata/static")
+
+	req := httptest.NewRequest(http.MethodGet, "/signin/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /signin/: expected 200, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !containsStr(body, "Sign In") {
+		t.Error("GET /signin/: expected signin/index.html content, got root index.html")
+	}
+}
+
+func TestFileServer_PrerenderedDirWithoutTrailingSlash(t *testing.T) {
+	// /signin (no slash) where signin/index.html exists on disk.
+	// http.FileServer issues a 301 → /signin/ which then serves the page.
+	handler := newFileServerHandler(t, "../../testdata/static")
+
+	req := httptest.NewRequest(http.MethodGet, "/signin", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	// http.FileServer redirects directories without trailing slash to add one.
+	if rec.Code != http.StatusMovedPermanently {
+		t.Fatalf("GET /signin: expected 301 redirect, got %d", rec.Code)
+	}
+	loc := rec.Header().Get("Location")
+	// httptest returns relative redirects; http.FileServer may use "signin/"
+	// or "/signin/" depending on context.
+	if loc != "/signin/" && loc != "signin/" {
+		t.Errorf("GET /signin: expected redirect to /signin/ or signin/, got %s", loc)
+	}
+}
+
+func TestFileServer_SPAFallbackForUnknownRoute(t *testing.T) {
+	// An extension-less path with no matching directory on disk should
+	// fall back to the root index.html (standard SPA behaviour).
+	handler := newFileServerHandler(t, "../../testdata/static")
+
+	req := httptest.NewRequest(http.MethodGet, "/dashboard/settings", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /dashboard/settings: expected 200, got %d", rec.Code)
+	}
+	if !containsStr(rec.Body.String(), "REP Gateway Test") {
+		t.Error("GET /dashboard/settings: expected root index.html via SPA fallback")
+	}
+}
+
+func TestFileServer_SPAFallbackForTrailingSlashNoDir(t *testing.T) {
+	// An extension-less path with trailing slash but no matching directory
+	// should also fall back to root index.html (pure SPA — Vite, CRA).
+	handler := newFileServerHandler(t, "../../testdata/static")
+
+	req := httptest.NewRequest(http.MethodGet, "/nonexistent/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /nonexistent/: expected 200, got %d", rec.Code)
+	}
+	if !containsStr(rec.Body.String(), "REP Gateway Test") {
+		t.Error("GET /nonexistent/: expected root index.html via SPA fallback")
+	}
+}
+
+func TestFileServer_MissingStaticAsset404(t *testing.T) {
+	// A request for a non-existent file WITH an extension should 404,
+	// not fall back to index.html.
+	handler := newFileServerHandler(t, "../../testdata/static")
+
+	req := httptest.NewRequest(http.MethodGet, "/missing.js", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET /missing.js: expected 404, got %d", rec.Code)
+	}
+}
+
+func TestFileServer_DirWithoutIndexHTMLFallsBack(t *testing.T) {
+	// A directory that exists but does NOT contain index.html should
+	// fall back to root index.html (SPA behaviour), not list the dir.
+	t.TempDir() // just for cleanup
+	dir := t.TempDir()
+
+	// Create root index.html.
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "index.html"),
+		[]byte("<html><body>Root</body></html>"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// Create a subdirectory without index.html.
+	if err := os.MkdirAll(filepath.Join(dir, "noindex"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "noindex", "data.txt"),
+		[]byte("not html"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	handler := newFileServerHandler(t, dir)
+
+	req := httptest.NewRequest(http.MethodGet, "/noindex/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /noindex/: expected 200, got %d", rec.Code)
+	}
+	if !containsStr(rec.Body.String(), "Root") {
+		t.Error("GET /noindex/: expected root index.html via SPA fallback, not dir listing")
 	}
 }
 
