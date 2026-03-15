@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/RuachTech/rep/compare/gateway/v0.1.3...gateway/v0.1.4) (2026-03-15)
+
+
+### Bug Fixes
+
+* **gateway:** serve pre-rendered directories before SPA fallback ([#32](https://github.com/RuachTech/rep/issues/32)) ([b448534](https://github.com/RuachTech/rep/commit/b4485347d9b73c73e313541e1bcee5b54ab0cb55))
+
 ## [0.1.3](https://github.com/RuachTech/rep/compare/gateway/v0.1.2...gateway/v0.1.3) (2026-02-22)
 
 
