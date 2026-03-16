@@ -65,6 +65,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	rec := &responseRecorder{
 		ResponseWriter: w,
 		body:           &bytes.Buffer{},
+		header:         make(http.Header),
 		statusCode:     http.StatusOK,
 	}
 
@@ -72,9 +73,10 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.next.ServeHTTP(rec, r)
 
 	// Check if the response is HTML.
-	contentType := rec.Header().Get("Content-Type")
+	contentType := rec.header.Get("Content-Type")
 	if !isHTML(contentType) {
 		// Not HTML — write the response as-is.
+		copyHeaders(w.Header(), rec.header)
 		w.WriteHeader(rec.statusCode)
 		if _, err := w.Write(rec.body.Bytes()); err != nil {
 			m.logger.Debug("rep.inject.write_error", "path", r.URL.Path, "error", err)
@@ -84,7 +86,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Decompress the body if the upstream ignored our Accept-Encoding removal.
 	body := rec.body.Bytes()
-	encoding := rec.Header().Get("Content-Encoding")
+	encoding := rec.header.Get("Content-Encoding")
 	if encoding != "" {
 		decompressed, err := decompressBody(body, encoding)
 		if err != nil {
@@ -93,6 +95,7 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				"path", r.URL.Path,
 				"reason", "unsupported Content-Encoding: "+encoding,
 			)
+			copyHeaders(w.Header(), rec.header)
 			w.WriteHeader(rec.statusCode)
 			if _, err := w.Write(body); err != nil {
 				m.logger.Debug("rep.inject.write_error", "path", r.URL.Path, "error", err)
@@ -110,6 +113,8 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Inject the REP script tag into the HTML.
 	injected := injectIntoHTML(body, tag)
+
+	copyHeaders(w.Header(), rec.header)
 
 	// Update Content-Length to reflect the injected content.
 	w.Header().Set("Content-Length", strconv.Itoa(len(injected)))
@@ -260,9 +265,14 @@ func isHTML(contentType string) bool {
 // responseRecorder captures the upstream response for inspection.
 type responseRecorder struct {
 	http.ResponseWriter
+	header      http.Header
 	body        *bytes.Buffer
 	statusCode  int
 	wroteHeader bool
+}
+
+func (r *responseRecorder) Header() http.Header {
+	return r.header
 }
 
 func (r *responseRecorder) WriteHeader(code int) {
@@ -277,12 +287,23 @@ func (r *responseRecorder) Write(b []byte) (int, error) {
 
 // Flush implements http.Flusher for streaming support.
 func (r *responseRecorder) Flush() {
-	if f, ok := r.ResponseWriter.(http.Flusher); ok {
-		f.Flush()
-	}
+	// Intentionally do nothing. The middleware buffers the full upstream response
+	// before deciding whether to inject, so flushing here would prematurely commit
+	// headers/body to the client.
 }
 
 // ReadFrom implements io.ReaderFrom for efficient copies.
 func (r *responseRecorder) ReadFrom(src io.Reader) (int64, error) {
 	return r.body.ReadFrom(src)
+}
+
+func copyHeaders(dst, src http.Header) {
+	for k := range dst {
+		dst.Del(k)
+	}
+	for k, values := range src {
+		for _, value := range values {
+			dst.Add(k, value)
+		}
+	}
 }

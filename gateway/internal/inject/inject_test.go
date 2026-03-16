@@ -191,6 +191,57 @@ func TestMiddleware_ContentLengthUpdated(t *testing.T) {
 	_ = expectedLen // The header value is set by the middleware.
 }
 
+func TestMiddleware_UpstreamFlushDoesNotCommitEarly(t *testing.T) {
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusCreated)
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		_, _ = w.Write([]byte(`<html><head></head><body>flushed</body></html>`))
+	})
+
+	m := New(upstream, testScriptTag, slog.Default())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+
+	m.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected status %d, got %d", http.StatusCreated, rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, testScriptTag) {
+		t.Fatal("expected injected script tag in flushed HTML response")
+	}
+	if !strings.Contains(body, "flushed") {
+		t.Fatal("expected original body content to be preserved after flush")
+	}
+}
+
+func TestMiddleware_BuffersHeadersUntilWriteback(t *testing.T) {
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Header().Set("X-REP-Test", "buffered")
+		_, _ = w.Write([]byte(`<html><head></head><body></body></html>`))
+	})
+
+	m := New(upstream, testScriptTag, slog.Default())
+
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	rec := httptest.NewRecorder()
+
+	m.ServeHTTP(rec, req)
+
+	if got := rec.Header().Get("X-REP-Test"); got != "buffered" {
+		t.Fatalf("expected buffered header to be copied back, got %q", got)
+	}
+	if got := rec.Header().Get("Content-Type"); got != "text/html" {
+		t.Fatalf("expected content type to survive buffering, got %q", got)
+	}
+}
+
 func TestIsHTML(t *testing.T) {
 	tests := []struct {
 		ct   string
