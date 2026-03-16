@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.5](https://github.com/RuachTech/rep/compare/gateway/v0.1.4...gateway/v0.1.5) (2026-03-16)
+
+
+### Bug Fixes
+
+* **gateway:** buffer response headers to prevent superfluous WriteHeader ([#35](https://github.com/RuachTech/rep/issues/35)) ([f82cd95](https://github.com/RuachTech/rep/commit/f82cd955a34c6443f39d02c6a1a7d71f154a214f))
+* reduce session key burst pressure ([#37](https://github.com/RuachTech/rep/issues/37)) ([57c911f](https://github.com/RuachTech/rep/commit/57c911f3b32f6f038e1c10a9c53eb71f6773d98c))
+
 ## [0.1.4](https://github.com/RuachTech/rep/compare/gateway/v0.1.3...gateway/v0.1.4) (2026-03-15)
 
 
