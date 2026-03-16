@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.11](https://github.com/RuachTech/rep/compare/sdk-v0.1.10...sdk-v0.1.11) (2026-03-16)
+
+
+### Bug Fixes
+
+* reduce session key burst pressure ([#37](https://github.com/RuachTech/rep/issues/37)) ([57c911f](https://github.com/RuachTech/rep/commit/57c911f3b32f6f038e1c10a9c53eb71f6773d98c))
+
 ## [0.1.10](https://github.com/RuachTech/rep/compare/sdk-v0.1.9...sdk-v0.1.10) (2026-03-14)
 
 

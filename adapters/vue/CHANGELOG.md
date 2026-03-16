@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.11](https://github.com/RuachTech/rep/compare/vue-v0.1.10...vue-v0.1.11) (2026-03-16)
+
+
+### Miscellaneous Chores
+
+* **vue:** Synchronize rep-packages versions
+
 ## [0.1.10](https://github.com/RuachTech/rep/compare/vue-v0.1.9...vue-v0.1.10) (2026-03-14)
 
 
