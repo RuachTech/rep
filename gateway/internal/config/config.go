@@ -115,7 +115,7 @@ func Parse(args []string, version string) (*Config, error) {
 	defaultHotReloadMode := "signal"
 	defaultPollInterval := "30s"
 	defaultSessionTTL := "30s"
-	defaultSessionMaxRate := 10
+	defaultSessionMaxRate := 15
 	defaultStrict := false
 	var defaultAllowedOrigins string
 

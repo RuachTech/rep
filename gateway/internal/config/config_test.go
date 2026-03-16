@@ -29,8 +29,8 @@ func TestParse_Defaults(t *testing.T) {
 	if cfg.LogFormat != "json" {
 		t.Errorf("expected log-format=json, got %s", cfg.LogFormat)
 	}
-	if cfg.SessionKeyMaxRate != 10 {
-		t.Errorf("expected session-key-max-rate=10, got %d", cfg.SessionKeyMaxRate)
+	if cfg.SessionKeyMaxRate != 15 {
+		t.Errorf("expected session-key-max-rate=15, got %d", cfg.SessionKeyMaxRate)
 	}
 }
 

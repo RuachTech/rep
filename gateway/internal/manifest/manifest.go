@@ -458,7 +458,7 @@ func defaultSettings() *Settings {
 		HotReloadMode:         "signal",
 		HotReloadPollInterval: 30 * time.Second,
 		SessionKeyTTL:         30 * time.Second,
-		SessionKeyMaxRate:     10,
+		SessionKeyMaxRate:     15,
 	}
 }
 
