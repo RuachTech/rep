@@ -156,11 +156,11 @@ importers:
   examples/todo-react:
     dependencies:
       '@rep-protocol/react':
-        specifier: workspace:*
-        version: link:../../adapters/react
+        specifier: ^0.1.7
+        version: 0.1.10(@rep-protocol/sdk@0.1.10)(react@18.3.1)
       '@rep-protocol/sdk':
-        specifier: workspace:*
-        version: link:../../sdk
+        specifier: ^0.1.7
+        version: 0.1.10
       react:
         specifier: ^18.3.0
         version: 18.3.1
@@ -169,8 +169,11 @@ importers:
         version: 18.3.1(react@18.3.1)
     devDependencies:
       '@rep-protocol/cli':
+        specifier: ^0.1.7
+        version: 0.1.10
+      '@rep-protocol/vite':
         specifier: workspace:*
-        version: link:../../cli
+        version: link:../../plugins/vite
       '@types/react':
         specifier: ^18.3.0
         version: 18.3.28
@@ -178,7 +181,7 @@ importers:
         specifier: ^18.3.0
         version: 18.3.7(@types/react@18.3.28)
       '@vitejs/plugin-react':
-        specifier: ^4.3.0
+        specifier: ^4.7.0
         version: 4.7.0(vite@5.4.21(@types/node@20.19.33))
       typescript:
         specifier: ^5.4.0
@@ -186,6 +189,28 @@ importers:
       vite:
         specifier: ^5.4.0
         version: 5.4.21(@types/node@20.19.33)
+
+  plugins/vite:
+    dependencies:
+      dotenv:
+        specifier: ^16.4.0
+        version: 16.6.1
+    devDependencies:
+      '@types/node':
+        specifier: ^20.11.0
+        version: 20.19.33
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
+      vite:
+        specifier: ^5.0.0
+        version: 5.4.21(@types/node@20.19.33)
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@20.19.33)(jsdom@28.1.0)
 
   sdk:
     devDependencies:
@@ -1303,6 +1328,19 @@ packages:
     resolution: {integrity: sha512-NkT+YAdgS2FPCn8mIA9bQhiBs+xmniMGq1LFPDhcFn0+2yIUEiIG06t7bsZlhdjknEQRTSdT7YitP6fC5qwP0g==}
     cpu: [x64]
     os: [win32]
+
+  '@rep-protocol/cli@0.1.10':
+    resolution: {integrity: sha512-qyj4bvfX8m/u/M3ESKjbsAC8Kp7/8E8VJSBBW5cQgbqkCtJNXmp5JOd1s7u1BBz60z8nnrjw3fBMfdv9+cv9og==}
+    hasBin: true
+
+  '@rep-protocol/react@0.1.10':
+    resolution: {integrity: sha512-lbXjEVKQPM1A7zyQW05u0W6mND0YF6tMUL45faKtSlMY+ztAc0DOw5pKXXGFqTWRza9S+Kxh2YcjwcWKAfzkFA==}
+    peerDependencies:
+      '@rep-protocol/sdk': 0.1.10
+      react: '>=16.8.0'
+
+  '@rep-protocol/sdk@0.1.10':
+    resolution: {integrity: sha512-u03UlBoyrmNeQ2+nmncjdecGSw3byIInAQXN4B0CdSVoV/5HW/zOnsBwRT+1Bei8AgaOmgbJoaNpM0s7fBcrAg==}
 
   '@rolldown/pluginutils@1.0.0-beta.27':
     resolution: {integrity: sha512-+d0F4MKMCbeVUJwG96uQ4SgAznZNSq93I3V+9NHA4OpvqG8mRCpGdKmK8l/dl02h2CCDHwW2FqilnTyDcAnqjA==}
@@ -5072,6 +5110,22 @@ snapshots:
 
   '@pagefind/windows-x64@1.4.0':
     optional: true
+
+  '@rep-protocol/cli@0.1.10':
+    dependencies:
+      ajv: 8.18.0
+      chalk: 5.6.2
+      commander: 12.1.0
+      dotenv: 16.6.1
+      glob: 13.0.6
+      js-yaml: 4.1.1
+
+  '@rep-protocol/react@0.1.10(@rep-protocol/sdk@0.1.10)(react@18.3.1)':
+    dependencies:
+      '@rep-protocol/sdk': 0.1.10
+      react: 18.3.1
+
+  '@rep-protocol/sdk@0.1.10': {}
 
   '@rolldown/pluginutils@1.0.0-beta.27': {}
 

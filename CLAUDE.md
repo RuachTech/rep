@@ -36,7 +36,7 @@ rep/
 │   └── release-sdk.yml                # Release workflow (npm + GoReleaser + Docker)
 │
 ├── package.json                       # Monorepo root (pnpm 9.0.0, private)
-├── pnpm-workspace.yaml                # Workspace: sdk, cli, adapters/*, codemod, examples/*
+├── pnpm-workspace.yaml                # Workspace: sdk, cli, adapters/*, plugins/*, codemod, examples/*
 ├── pnpm-lock.yaml
 ├── release-please-config.json         # Release-please config for all packages
 ├── .release-please-manifest.json      # Per-package version tracker
@@ -123,6 +123,18 @@ rep/
 │   ├── react/                         # @rep-protocol/react — useRep(), useRepSecure()
 │   ├── vue/                           # @rep-protocol/vue — useRep() composable
 │   └── svelte/                        # @rep-protocol/svelte — repStore()
+│
+├── plugins/
+│   └── vite/                          # @rep-protocol/vite — Vite dev server plugin
+│       ├── package.json               # v0.1.10
+│       ├── src/
+│       │   ├── index.ts               # repPlugin() — Vite plugin entry
+│       │   ├── payload.ts             # Payload builder (mirrors Go payload.go)
+│       │   ├── crypto.ts              # AES-256-GCM, HMAC-SHA256, SRI, HKDF (Node crypto)
+│       │   ├── env.ts                 # Read env file + classify variables by prefix
+│       │   ├── guardrails.ts          # Shannon entropy + known format checks (mirrors cli/)
+│       │   └── __tests__/             # 49 tests
+│       └── vitest.config.ts
 │
 ├── codemod/                           # @rep-protocol/codemod
 │   └── src/transforms/               # CRA, Next.js, Vite transforms
@@ -280,6 +292,12 @@ Full threat analysis in `spec/SECURITY-MODEL.md`.
 - **Synchronous init, lazy async.** SDK reads the DOM synchronously on import. SSE connects lazily on first `onChange()` call.
 - **Named export + default namespace.** Both `import { get } from '@rep-protocol/sdk'` and `import { rep } from '@rep-protocol/sdk'` work.
 
+### TypeScript (Vite Plugin)
+
+- **Crypto, payload, env, and guardrails modules mirror gateway Go logic.** Changes to `gateway/internal/crypto/crypto.go`, `gateway/pkg/payload/payload.go`, `gateway/internal/config/classify.go`, or `cli/src/utils/guardrails.ts` must be reflected in `plugins/vite/src/`. The Vite plugin produces byte-identical JSON to the Go gateway (sorted keys, Go HTML escaping of `<>&`).
+- **`dotenv` is the only runtime dependency.** Everything else uses `node:crypto` and `node:fs`.
+- **Session key endpoint is simplified for dev.** No rate limiting or single-use enforcement — this is a dev-only tool, not a production gateway.
+
 ### TypeScript (Testing)
 
 - **Vitest + jsdom** across all TS packages.
@@ -316,6 +334,10 @@ pnpm build && pnpm test
 
 # Adapters (from adapters/react/, adapters/vue/, adapters/svelte/)
 pnpm build && pnpm test
+
+# Vite Plugin (from plugins/vite/)
+pnpm build                      # Build CJS + ESM + types → dist/
+pnpm test                       # Run vitest (49 tests)
 ```
 
 ---
