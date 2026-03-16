@@ -12,6 +12,7 @@ _cgo_gotypes.go
 _cgo_export.*
 _obj/
 _test/
+.gocache/
 
 # ─── Node / TypeScript (sdk, cli) ─────────────────────────────────────────────
 **/node_modules/
