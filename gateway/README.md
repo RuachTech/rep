@@ -125,7 +125,7 @@ All configuration is via CLI flags or `REP_GATEWAY_*` environment variables. Fla
 | `--log-level` | `REP_GATEWAY_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |
 | `--allowed-origins` | `REP_GATEWAY_ALLOWED_ORIGINS` | (empty) | CORS origins for session key endpoint |
 | `--session-key-ttl` | `REP_GATEWAY_SESSION_KEY_TTL` | `30s` | Session key time-to-live |
-| `--session-key-max-rate` | `REP_GATEWAY_SESSION_KEY_MAX_RATE` | `10` | Max session key requests/min/IP |
+| `--session-key-max-rate` | `REP_GATEWAY_SESSION_KEY_MAX_RATE` | `15` | Max session key requests/min/IP |
 | `--health-port` | `REP_GATEWAY_HEALTH_PORT` | `0` | Separate health check port (0 = same) |
 | `--version` | — | — | Print version and exit |
 

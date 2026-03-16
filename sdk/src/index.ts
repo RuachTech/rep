@@ -60,6 +60,7 @@ let _publicVars: Readonly<Record<string, string>> = Object.freeze({});
 
 // Cache for decrypted sensitive variables (in-memory only, never persisted).
 let _sensitiveCache: Record<string, string> | null = null;
+let _sensitiveLoadPromise: Promise<Record<string, string>> | null = null;
 
 // Hot reload state.
 let _eventSource: EventSource | null = null;
@@ -187,56 +188,73 @@ export async function getSecure(key: string): Promise<string> {
     return _sensitiveCache[key];
   }
 
-  // Fetch session key from the gateway.
-  const resp = await fetch(_payload._meta.key_endpoint);
-  if (!resp.ok) {
-    throw new REPError(`Session key request failed: ${resp.status} ${resp.statusText}`);
+  if (!_sensitiveLoadPromise) {
+    _sensitiveLoadPromise = _loadSensitiveVars();
   }
 
-  const sessionKey: SessionKeyResponse = await resp.json();
-
-  // Decode the encryption key.
-  const rawKey = Uint8Array.from(atob(sessionKey.key), (c) => c.charCodeAt(0));
-
-  // Decode the encrypted blob.
-  const blobBytes = Uint8Array.from(atob(_payload.sensitive), (c) => c.charCodeAt(0));
-
-  // Extract nonce (first 12 bytes) and ciphertext+tag (rest).
-  const nonce = blobBytes.slice(0, 12);
-  const ciphertext = blobBytes.slice(12);
-
-  // Decrypt using Web Crypto API (AES-256-GCM).
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    rawKey,
-    { name: 'AES-GCM' },
-    false,
-    ['decrypt']
-  );
-
-  // The AAD is the preliminary integrity token (see payload builder).
-  // For simplicity in the SDK, we use the integrity from _meta.
-  // This matches the gateway's encryption AAD.
-  const encoder = new TextEncoder();
-  const aad = encoder.encode(_payload._meta.integrity);
-
-  const plaintext = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: nonce, additionalData: aad },
-    cryptoKey,
-    ciphertext
-  );
-
-  const decoder = new TextDecoder();
-  const sensitiveMap: Record<string, string> = JSON.parse(decoder.decode(plaintext));
-
-  // Cache all decrypted values.
-  _sensitiveCache = sensitiveMap;
+  const sensitiveMap = await _sensitiveLoadPromise;
 
   if (!(key in sensitiveMap)) {
     throw new REPError(`SENSITIVE variable "${key}" not found in payload.`);
   }
 
   return sensitiveMap[key];
+}
+
+async function _loadSensitiveVars(): Promise<Record<string, string>> {
+  try {
+    if (!_payload || !_payload.sensitive || !_payload._meta.key_endpoint) {
+      throw new REPError('No SENSITIVE tier variables in payload.');
+    }
+
+    // Fetch session key from the gateway.
+    const resp = await fetch(_payload._meta.key_endpoint);
+    if (!resp.ok) {
+      throw new REPError(`Session key request failed: ${resp.status} ${resp.statusText}`);
+    }
+
+    const sessionKey: SessionKeyResponse = await resp.json();
+
+    // Decode the encryption key.
+    const rawKey = Uint8Array.from(atob(sessionKey.key), (c) => c.charCodeAt(0));
+
+    // Decode the encrypted blob.
+    const blobBytes = Uint8Array.from(atob(_payload.sensitive), (c) => c.charCodeAt(0));
+
+    // Extract nonce (first 12 bytes) and ciphertext+tag (rest).
+    const nonce = blobBytes.slice(0, 12);
+    const ciphertext = blobBytes.slice(12);
+
+    // Decrypt using Web Crypto API (AES-256-GCM).
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw',
+      rawKey,
+      { name: 'AES-GCM' },
+      false,
+      ['decrypt']
+    );
+
+    // The AAD is the preliminary integrity token (see payload builder).
+    // For simplicity in the SDK, we use the integrity from _meta.
+    // This matches the gateway's encryption AAD.
+    const encoder = new TextEncoder();
+    const aad = encoder.encode(_payload._meta.integrity);
+
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: nonce, additionalData: aad },
+      cryptoKey,
+      ciphertext
+    );
+
+    const decoder = new TextDecoder();
+    const sensitiveMap: Record<string, string> = JSON.parse(decoder.decode(plaintext));
+
+    // Cache all decrypted values.
+    _sensitiveCache = sensitiveMap;
+    return sensitiveMap;
+  } finally {
+    _sensitiveLoadPromise = null;
+  }
 }
 
 /**
