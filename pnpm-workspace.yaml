@@ -2,5 +2,6 @@ packages:
   - 'sdk'
   - 'cli'
   - 'adapters/*'
+  - 'plugins/*'
   - 'codemod'
   - 'docs'

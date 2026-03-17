@@ -30,27 +30,31 @@ A complete React todo app demonstrating all REP features. Source code at [`examp
 
 ## Running locally
 
-### With the CLI
+### With the Vite plugin (recommended)
+
+The project includes `@rep-protocol/vite` in `vite.config.ts`. No gateway needed for development:
 
 ```bash
-# From the repo root
-pnpm install
-
-# Validate the manifest
 cd examples/todo-react
-npx @rep-protocol/cli validate
-
-# Generate TypeScript types
-npx @rep-protocol/cli typegen
-
-# Start Vite dev server
+pnpm install
 pnpm dev
-
-# In another terminal: start REP gateway proxy
-npx @rep-protocol/cli dev --proxy http://localhost:5173
 ```
 
-Open `http://localhost:8080` to see the app with REP-injected variables.
+Open `http://localhost:5173`. The Vite plugin reads `.env.local` and injects the REP payload automatically.
+
+### With the CLI gateway
+
+If you need full gateway fidelity (rate-limited session keys, CORS origin checking):
+
+```bash
+# Terminal 1: Start Vite dev server
+pnpm dev
+
+# Terminal 2: Start REP gateway proxy
+pnpm dev:gateway
+```
+
+Open `http://localhost:3000` (the gateway port).
 
 ### With Docker
 

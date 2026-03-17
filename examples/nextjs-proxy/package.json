@@ -13,11 +13,12 @@
     "next": "^15.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@rep-protocol/sdk": "^0.1.8",
-    "@rep-protocol/react": "^0.1.8"
+    "@rep-protocol/sdk": "^0.1.11",
+    "@rep-protocol/react": "^0.1.11"
   },
   "devDependencies": {
-    "@rep-protocol/cli": "^0.1.8",
+    "@rep-protocol/cli": "^0.1.11",
+    "@rep-protocol/next": "^0.1.11",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

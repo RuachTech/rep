@@ -16,7 +16,9 @@
         "codemod",
         "react",
         "vue",
-        "svelte"
+        "svelte",
+        "vite",
+        "next"
       ]
     }
   ],
@@ -38,6 +40,12 @@
     },
     "adapters/svelte": {
       "component": "svelte"
+    },
+    "plugins/vite": {
+      "component": "vite"
+    },
+    "plugins/next": {
+      "component": "next"
     },
     "gateway": {
       "release-type": "simple",

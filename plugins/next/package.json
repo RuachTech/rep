@@ -1,0 +1,65 @@
+{
+  "name": "@rep-protocol/next",
+  "version": "0.1.10",
+  "description": "Next.js integration for the Runtime Environment Protocol (REP). Injects REP environment variables during development without needing the Go gateway.",
+  "author": "Ruach Tech",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ruachtech/rep",
+    "directory": "plugins/next"
+  },
+  "homepage": "https://github.com/ruachtech/rep#readme",
+  "keywords": [
+    "nextjs",
+    "next",
+    "environment-variables",
+    "runtime-config",
+    "docker",
+    "containers",
+    "frontend",
+    "rep",
+    "server-components"
+  ],
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
+    "./session-key": {
+      "types": "./dist/session-key.d.ts",
+      "import": "./dist/session-key.mjs",
+      "require": "./dist/session-key.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts src/session-key.ts --format cjs,esm --dts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "next": ">=14.0.0",
+    "react": ">=18.0.0"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.3.0",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  }
+}

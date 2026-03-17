@@ -5,5 +5,7 @@
   "adapters/react": "0.1.11",
   "adapters/vue": "0.1.11",
   "adapters/svelte": "0.1.11",
+  "plugins/vite": "0.1.11",
+  "plugins/next": "0.1.11",
   "gateway": "0.1.5"
 }
