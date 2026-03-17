@@ -188,6 +188,49 @@ describe('getSecure()', () => {
     const { getSecure } = await import('../index');
     await expect(getSecure('KEY')).rejects.toThrow('500');
   });
+
+  it('coalesces concurrent session key requests', async () => {
+    injectPayload(
+      makePayload({}, { sensitive: 'dGVzdA==', keyEndpoint: '/rep/session-key' })
+    );
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { getSecure } = await import('../index');
+
+    await Promise.allSettled([getSecure('A'), getSecure('B'), getSecure('C')]);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries after a failed coalesced request', async () => {
+    injectPayload(
+      makePayload({}, { sensitive: 'dGVzdA==', keyEndpoint: '/rep/session-key' })
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { getSecure } = await import('../index');
+
+    await expect(Promise.all([getSecure('A'), getSecure('B')])).rejects.toThrow('429');
+    await expect(getSecure('A')).rejects.toThrow('500');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
 
 // ─── onChange() ──────────────────────────────────────────────────────────────
