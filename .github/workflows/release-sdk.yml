@@ -71,11 +71,13 @@ jobs:
             ["adapters/react"]="react-v"
             ["adapters/vue"]="vue-v"
             ["adapters/svelte"]="svelte-v"
+            ["plugins/vite"]="vite-v"
+            ["plugins/next"]="next-v"
           )
 
           TAGGED=0
 
-          for pkg_path in "sdk" "cli" "codemod" "adapters/react" "adapters/vue" "adapters/svelte"; do
+          for pkg_path in "sdk" "cli" "codemod" "adapters/react" "adapters/vue" "adapters/svelte" "plugins/vite" "plugins/next"; do
             manifest_ver=$(jq -r --arg p "$pkg_path" '.[$p]' .release-please-manifest.json)
             pkg_ver=$(jq -r '.version' "${pkg_path}/package.json")
             prefix="${TAG_PREFIX[$pkg_path]}"
@@ -281,6 +283,24 @@ jobs:
           V=$(node -p "require('./package.json').version")
           PUBLISHED=$(npm view @rep-protocol/svelte@${V} version 2>/dev/null || true)
           if [ "$PUBLISHED" = "$V" ]; then echo "svelte@${V} already published, skipping."; else pnpm publish --provenance --access public --no-git-checks; fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish vite plugin
+        working-directory: plugins/vite
+        run: |
+          V=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @rep-protocol/vite@${V} version 2>/dev/null || true)
+          if [ "$PUBLISHED" = "$V" ]; then echo "vite@${V} already published, skipping."; else pnpm publish --provenance --access public --no-git-checks; fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish next plugin
+        working-directory: plugins/next
+        run: |
+          V=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view @rep-protocol/next@${V} version 2>/dev/null || true)
+          if [ "$PUBLISHED" = "$V" ]; then echo "next@${V} already published, skipping."; else pnpm publish --provenance --access public --no-git-checks; fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 

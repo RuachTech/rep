@@ -39,10 +39,6 @@
   "files": [
     "dist"
   ],
-  "publishConfig": {
-    "access": "public",
-    "provenance": true
-  },
   "scripts": {
     "build": "tsup src/index.ts src/session-key.ts --format cjs,esm --dts",
     "test": "vitest run",

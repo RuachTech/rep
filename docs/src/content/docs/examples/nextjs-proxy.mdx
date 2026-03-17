@@ -31,8 +31,10 @@ The Next.js server is never exposed directly. All traffic flows through the gate
 - examples/nextjs-proxy/
   - src/
     - app/
-      - layout.tsx
+      - layout.tsx         Includes RepScript for dev-time injection
       - page.tsx           Server component shell
+      - api/rep/session-key/
+        - route.ts         Dev-only session key endpoint
     - components/
       - EnvDisplay.tsx     Client component — reads REP vars
       - IntegrityBanner.tsx  Verifies payload was not modified in transit
@@ -192,14 +194,29 @@ See [`examples/nextjs-csr-embedded/k8s/`](https://github.com/ruachtech/rep/tree/
 </TabItem>
 </Tabs>
 
-## CLI dev mode (no Docker)
+## Local development
+
+### With `@rep-protocol/next` (recommended)
+
+The project includes `RepScript` in `app/layout.tsx` and a session-key route handler. No gateway needed for development:
+
+```bash
+cp .env.example .env.local   # if you haven't already
+npm run dev
+```
+
+Open `http://localhost:3000`. `RepScript` injects the REP payload during `next dev` and returns `null` in production.
+
+### With the CLI gateway
+
+If you need full gateway fidelity:
 
 ```bash
 # Terminal 1 — run Next.js dev server
 npm run dev   # starts on :3000
 
 # Terminal 2 — run REP gateway in proxy mode
-npx @rep-protocol/cli dev --proxy http://localhost:3000 --env-file .env.local
+npx @rep-protocol/cli dev --proxy http://localhost:3000 --env .env.local
 ```
 
 Open `http://localhost:8080`.

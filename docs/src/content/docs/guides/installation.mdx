@@ -35,6 +35,59 @@ If you're using React, Vue, or Svelte, install the corresponding adapter for hot
   </TabItem>
 </Tabs>
 
+## Build-tool plugins (optional)
+
+For the best dev experience, install the plugin for your build tool. These inject the REP payload during development so the SDK works without running the Go gateway:
+
+<Tabs>
+  <TabItem label="Vite">
+  ```bash
+  npm install -D @rep-protocol/vite
+  ```
+
+  ```ts
+  // vite.config.ts
+  import { repPlugin } from '@rep-protocol/vite';
+
+  export default defineConfig({
+    plugins: [repPlugin()],
+  });
+  ```
+
+  That's it — `rep.get()` and `rep.getSecure()` now work in `vite dev`. No gateway needed.
+  </TabItem>
+  <TabItem label="Next.js">
+  ```bash
+  npm install -D @rep-protocol/next
+  ```
+
+  ```tsx
+  // app/layout.tsx
+  import { RepScript } from '@rep-protocol/next';
+
+  export default function RootLayout({ children }: { children: React.ReactNode }) {
+    return (
+      <html>
+        <head><RepScript /></head>
+        <body>{children}</body>
+      </html>
+    );
+  }
+  ```
+
+  ```ts
+  // app/api/rep/session-key/route.ts (only needed for SENSITIVE vars)
+  export { GET } from '@rep-protocol/next/session-key';
+  ```
+
+  `RepScript` renders the REP payload during `next dev` and returns `null` in production — the gateway handles injection in prod.
+  </TabItem>
+</Tabs>
+
+<Aside>
+  Build-tool plugins are for **development only**. In production, the Go gateway injects the payload. The plugins produce byte-identical output to the gateway, so the SDK works identically in both environments.
+</Aside>
+
 ## CLI
 
 The CLI provides `rep validate`, `rep typegen`, `rep lint`, and `rep dev` commands. It automatically downloads the correct gateway binary for your platform during installation.

@@ -7,7 +7,70 @@ import { Tabs, TabItem, Aside } from '@astrojs/starlight/components';
 
 During local development you typically don't have the REP gateway running. The SDK handles this gracefully — `rep.get()` returns `undefined` when no payload is present.
 
-## Option A: Default values (simplest)
+## Option A: Build-tool plugin (recommended)
+
+The easiest way to get full REP support in development. The plugin injects the same `<script id="__rep__">` tag that the gateway produces, so the SDK works identically.
+
+<Tabs>
+  <TabItem label="Vite">
+  ```bash
+  npm install -D @rep-protocol/vite
+  ```
+
+  ```ts
+  // vite.config.ts
+  import { repPlugin } from '@rep-protocol/vite';
+
+  export default defineConfig({
+    plugins: [repPlugin()],
+  });
+  ```
+
+  The plugin reads `.env.local` (configurable via `env` option), classifies variables, encrypts sensitive vars, and injects the payload into your HTML. Changes to `.env.local` trigger a full page reload.
+
+  ```bash
+  # Just run Vite as normal — no second terminal needed
+  npm run dev
+  ```
+  </TabItem>
+  <TabItem label="Next.js">
+  ```bash
+  npm install -D @rep-protocol/next
+  ```
+
+  ```tsx
+  // app/layout.tsx
+  import { RepScript } from '@rep-protocol/next';
+
+  export default function RootLayout({ children }: { children: React.ReactNode }) {
+    return (
+      <html>
+        <head><RepScript /></head>
+        <body>{children}</body>
+      </html>
+    );
+  }
+  ```
+
+  ```ts
+  // app/api/rep/session-key/route.ts (only needed for SENSITIVE vars)
+  export { GET } from '@rep-protocol/next/session-key';
+  ```
+
+  `RepScript` is a React Server Component that renders the REP payload during `next dev`. It returns `null` in production — the gateway handles injection in prod. No build-time env vars are baked into the output.
+
+  ```bash
+  # Just run Next.js as normal — no second terminal needed
+  npm run dev
+  ```
+  </TabItem>
+</Tabs>
+
+<Aside>
+  Both plugins run guardrails on PUBLIC vars and warn if they look like secrets. Use the `strict` option to make warnings into errors.
+</Aside>
+
+## Option B: Default values (simplest)
 
 Use the second argument to `rep.get()`:
 
@@ -19,7 +82,7 @@ const apiUrl = rep.get('API_URL', 'http://localhost:3000');
 
 This is the simplest approach and works with any framework. No extra configuration needed.
 
-## Option B: Mock payload in HTML
+## Option C: Mock payload in HTML
 
 Add a `<script id="__rep__">` tag to your `index.html`:
 
@@ -47,7 +110,7 @@ This gives you the full SDK experience (including `rep.verify()` and `rep.meta()
   Don't forget to remove this tag from your production HTML. In production, the gateway injects it automatically.
 </Aside>
 
-## Option C: CLI dev server (full fidelity)
+## Option D: CLI dev server (full fidelity)
 
 The `rep dev` command runs a local gateway that reads your `.env` file and proxies to your dev server:
 

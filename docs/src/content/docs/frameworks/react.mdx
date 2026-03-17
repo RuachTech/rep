@@ -99,20 +99,28 @@ Both hooks subscribe to the gateway's SSE stream when `--hot-reload` is enabled.
 
 ## Development mode
 
-Without the gateway running, `useRep()` returns `undefined`. Two approaches:
+Without the gateway running, `useRep()` returns `undefined`. Three approaches:
 
 <Tabs>
+  <TabItem label="Vite plugin (recommended)">
+  ```bash
+  npm install -D @rep-protocol/vite
+  ```
+
+  ```ts
+  // vite.config.ts
+  import { repPlugin } from '@rep-protocol/vite';
+
+  export default defineConfig({
+    plugins: [react(), repPlugin()],
+  });
+  ```
+
+  The plugin reads `.env.local` and injects the REP payload during `vite dev` — no gateway needed. Just run `npm run dev` as normal.
+  </TabItem>
   <TabItem label="Default values">
   ```tsx
   const apiUrl = useRep('API_URL', 'http://localhost:3000');
-  ```
-  </TabItem>
-  <TabItem label="Mock payload">
-  Add to your `index.html` during development:
-  ```html
-  <script id="__rep__" type="application/json">
-  {"public":{"API_URL":"http://localhost:3000","FEATURE_FLAGS":"dark-mode"},"_meta":{"version":"0.1.0","injected_at":"2026-01-01T00:00:00Z","integrity":"hmac-sha256:dev","ttl":0}}
-  </script>
   ```
   </TabItem>
   <TabItem label="CLI dev server">
