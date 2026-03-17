@@ -125,15 +125,27 @@ rep/
 │   └── svelte/                        # @rep-protocol/svelte — repStore()
 │
 ├── plugins/
-│   └── vite/                          # @rep-protocol/vite — Vite dev server plugin
-│       ├── package.json               # v0.1.10
+│   ├── vite/                          # @rep-protocol/vite — Vite dev server plugin
+│   │   ├── package.json               # v0.1.10
+│   │   ├── src/
+│   │   │   ├── index.ts               # repPlugin() — Vite plugin entry
+│   │   │   ├── payload.ts             # Payload builder (mirrors Go payload.go)
+│   │   │   ├── crypto.ts              # AES-256-GCM, HMAC-SHA256, SRI, HKDF (Node crypto)
+│   │   │   ├── env.ts                 # Read env file + classify variables by prefix
+│   │   │   ├── guardrails.ts          # Shannon entropy + known format checks (mirrors cli/)
+│   │   │   └── __tests__/             # 49 tests
+│   │   └── vitest.config.ts
+│   └── next/                          # @rep-protocol/next — Next.js dev integration
+│       ├── package.json               # v0.1.10; exports "." (RepScript) + "./session-key" (route handler)
 │       ├── src/
-│       │   ├── index.ts               # repPlugin() — Vite plugin entry
-│       │   ├── payload.ts             # Payload builder (mirrors Go payload.go)
-│       │   ├── crypto.ts              # AES-256-GCM, HMAC-SHA256, SRI, HKDF (Node crypto)
-│       │   ├── env.ts                 # Read env file + classify variables by prefix
-│       │   ├── guardrails.ts          # Shannon entropy + known format checks (mirrors cli/)
-│       │   └── __tests__/             # 49 tests
+│       │   ├── index.ts               # RepScript RSC — renders <script> in dev, null in prod
+│       │   ├── session-key.ts         # GET handler for app/api/rep/session-key/route.ts
+│       │   ├── keys.ts               # Module-scoped singleton for ephemeral keys
+│       │   ├── payload.ts            # Payload builder (shared with vite plugin)
+│       │   ├── crypto.ts             # AES-256-GCM, HMAC-SHA256, SRI, HKDF (shared with vite plugin)
+│       │   ├── env.ts                # Read env file + classify variables (shared with vite plugin)
+│       │   ├── guardrails.ts         # Shannon entropy + known format checks (shared with vite plugin)
+│       │   └── __tests__/            # 13 tests
 │       └── vitest.config.ts
 │
 ├── codemod/                           # @rep-protocol/codemod
@@ -292,11 +304,14 @@ Full threat analysis in `spec/SECURITY-MODEL.md`.
 - **Synchronous init, lazy async.** SDK reads the DOM synchronously on import. SSE connects lazily on first `onChange()` call.
 - **Named export + default namespace.** Both `import { get } from '@rep-protocol/sdk'` and `import { rep } from '@rep-protocol/sdk'` work.
 
-### TypeScript (Vite Plugin)
+### TypeScript (Vite & Next.js Plugins)
 
-- **Crypto, payload, env, and guardrails modules mirror gateway Go logic.** Changes to `gateway/internal/crypto/crypto.go`, `gateway/pkg/payload/payload.go`, `gateway/internal/config/classify.go`, or `cli/src/utils/guardrails.ts` must be reflected in `plugins/vite/src/`. The Vite plugin produces byte-identical JSON to the Go gateway (sorted keys, Go HTML escaping of `<>&`).
-- **`dotenv` is the only runtime dependency.** Everything else uses `node:crypto` and `node:fs`.
-- **Session key endpoint is simplified for dev.** No rate limiting or single-use enforcement — this is a dev-only tool, not a production gateway.
+- **Crypto, payload, env, and guardrails modules mirror gateway Go logic.** Changes to `gateway/internal/crypto/crypto.go`, `gateway/pkg/payload/payload.go`, `gateway/internal/config/classify.go`, or `cli/src/utils/guardrails.ts` must be reflected in **both** `plugins/vite/src/` and `plugins/next/src/`. All three implementations (Go gateway, Vite plugin, Next.js plugin) must produce byte-identical JSON (sorted keys, Go HTML escaping of `<>&`).
+- **`plugins/next/src/` shares `crypto.ts`, `env.ts`, `guardrails.ts`, `payload.ts` with `plugins/vite/src/`.** These files are currently copies. When modifying shared logic, update both locations.
+- **`dotenv` is the only runtime dependency** for both plugins. Everything else uses `node:crypto` and `node:fs`.
+- **Session key endpoints are simplified for dev.** No rate limiting or single-use enforcement — these are dev-only tools, not production gateways.
+- **Next.js plugin: `RepScript` returns `null` in production.** The gateway handles injection in prod. `RepScript` only renders during `next dev` to avoid baking env vars into static HTML at build time.
+- **Next.js plugin: session-key route handler returns 404 in production.** Prevents accidental exposure of an unhardened key endpoint alongside the gateway's rate-limited one.
 
 ### TypeScript (Testing)
 
@@ -338,6 +353,10 @@ pnpm build && pnpm test
 # Vite Plugin (from plugins/vite/)
 pnpm build                      # Build CJS + ESM + types → dist/
 pnpm test                       # Run vitest (49 tests)
+
+# Next.js Plugin (from plugins/next/)
+pnpm build                      # Build CJS + ESM + types → dist/ (two entry points)
+pnpm test                       # Run vitest (13 tests)
 ```
 
 ---

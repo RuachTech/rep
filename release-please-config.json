@@ -17,7 +17,8 @@
         "react",
         "vue",
         "svelte",
-        "vite"
+        "vite",
+        "next"
       ]
     }
   ],
@@ -42,6 +43,9 @@
     },
     "plugins/vite": {
       "component": "vite"
+    },
+    "plugins/next": {
+      "component": "next"
     },
     "gateway": {
       "release-type": "simple",
