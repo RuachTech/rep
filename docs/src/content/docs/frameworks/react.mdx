@@ -109,6 +109,8 @@ Without the gateway running, `useRep()` returns `undefined`. Three approaches:
 
   ```ts
   // vite.config.ts
+  import { defineConfig } from 'vite';
+  import react from '@vitejs/plugin-react';
   import { repPlugin } from '@rep-protocol/vite';
 
   export default defineConfig({

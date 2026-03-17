@@ -19,6 +19,7 @@ The easiest way to get full REP support in development. The plugin injects the s
 
   ```ts
   // vite.config.ts
+  import { defineConfig } from 'vite';
   import { repPlugin } from '@rep-protocol/vite';
 
   export default defineConfig({
@@ -40,9 +41,10 @@ The easiest way to get full REP support in development. The plugin injects the s
 
   ```tsx
   // app/layout.tsx
+  import type { ReactNode } from 'react';
   import { RepScript } from '@rep-protocol/next';
 
-  export default function RootLayout({ children }: { children: React.ReactNode }) {
+  export default function RootLayout({ children }: { children: ReactNode }) {
     return (
       <html>
         <head><RepScript /></head>

@@ -1,5 +1,5 @@
 /**
- * Guardrails — secret detection for REP Vite plugin.
+ * Guardrails — secret detection for REP Next.js plugin.
  * Copied from cli/src/utils/guardrails.ts (scanValue + shannonEntropy only).
  *
  * Implements Shannon entropy calculation and known secret format detection

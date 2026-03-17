@@ -97,7 +97,6 @@ export function repPlugin(options: RepPluginOptions = {}): Plugin {
 
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Cache-Control', 'no-store');
-        res.setHeader('Access-Control-Allow-Origin', '*');
         res.end(body);
       });
     },

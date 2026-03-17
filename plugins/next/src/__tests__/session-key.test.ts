@@ -43,7 +43,6 @@ describe('GET /rep/session-key', () => {
       // Verify headers
       expect(response.headers.get('Cache-Control')).toBe('no-store');
       expect(response.headers.get('Content-Type')).toBe('application/json');
-      expect(response.headers.get('Access-Control-Allow-Origin')).toBe('*');
     } finally {
       process.env.NODE_ENV = origNodeEnv;
     }

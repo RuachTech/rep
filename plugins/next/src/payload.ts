@@ -20,12 +20,17 @@ export interface PayloadOptions {
 
 /**
  * Build the REP payload JSON and script tag.
- * Matches gateway/pkg/payload/payload.go:Build + ScriptTag exactly.
+ * Mirrors gateway/pkg/payload/payload.go:Build + ScriptTag.
  *
- * JSON field order must match Go struct serialization:
+ * JSON field order matches Go struct serialization:
  *   { "public": {...}, "sensitive": "...", "_meta": {...} }
  *
  * All string values get Go HTML escaping (< > & → \u003c \u003e \u0026).
+ *
+ * Note: `injected_at` uses JS Date.toISOString() (millisecond precision)
+ * while Go uses time.RFC3339Nano (nanosecond precision). This is harmless —
+ * the timestamp differs per-request anyway and the SRI hash is computed
+ * over the actual JSON bytes produced by each implementation.
  */
 export function buildPayload(
   classified: ClassifiedVars,

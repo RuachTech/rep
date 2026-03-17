@@ -47,6 +47,7 @@ For the best dev experience, install the plugin for your build tool. These injec
 
   ```ts
   // vite.config.ts
+  import { defineConfig } from 'vite';
   import { repPlugin } from '@rep-protocol/vite';
 
   export default defineConfig({
@@ -63,9 +64,10 @@ For the best dev experience, install the plugin for your build tool. These injec
 
   ```tsx
   // app/layout.tsx
+  import type { ReactNode } from 'react';
   import { RepScript } from '@rep-protocol/next';
 
-  export default function RootLayout({ children }: { children: React.ReactNode }) {
+  export default function RootLayout({ children }: { children: ReactNode }) {
     return (
       <html>
         <head><RepScript /></head>

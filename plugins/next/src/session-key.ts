@@ -38,7 +38,6 @@ export function GET(): Response {
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-store',
-        'Access-Control-Allow-Origin': '*',
       },
     },
   );
