@@ -36,7 +36,7 @@ rep/
 │   └── release-sdk.yml                # Release workflow (npm + GoReleaser + Docker)
 │
 ├── package.json                       # Monorepo root (pnpm 9.0.0, private)
-├── pnpm-workspace.yaml                # Workspace: sdk, cli, adapters/*, plugins/*, codemod, examples/*
+├── pnpm-workspace.yaml                # Workspace: sdk, cli, adapters/*, plugins/*, codemod, docs
 ├── pnpm-lock.yaml
 ├── release-please-config.json         # Release-please config for all packages
 ├── .release-please-manifest.json      # Per-package version tracker
