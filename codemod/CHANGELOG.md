@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.13](https://github.com/RuachTech/rep/compare/codemod-v0.1.12...codemod-v0.1.13) (2026-03-19)
+
+
+### Miscellaneous Chores
+
+* **codemod:** Synchronize rep-packages versions
+
 ## [0.1.12](https://github.com/RuachTech/rep/compare/codemod-v0.1.11...codemod-v0.1.12) (2026-03-17)
 
 
