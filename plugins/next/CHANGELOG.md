@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.13](https://github.com/RuachTech/rep/compare/next-v0.1.12...next-v0.1.13) (2026-03-19)
+
+
+### Bug Fixes
+
+* add README.md for @rep-protocol/next plugin; enhance keys management ([#42](https://github.com/RuachTech/rep/issues/42)) ([708ced3](https://github.com/RuachTech/rep/commit/708ced3a752b3178a505c3569874ddeed481849e))
+
 ## [0.1.12](https://github.com/RuachTech/rep/compare/next-v0.1.11...next-v0.1.12) (2026-03-17)
 
 
