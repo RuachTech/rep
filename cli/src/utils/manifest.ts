@@ -7,12 +7,13 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
 import Ajv, { type ValidateFunction } from 'ajv';
+import addFormats from 'ajv-formats';
 
 export interface ManifestVariable {
   tier: 'public' | 'sensitive' | 'server';
   type?: 'string' | 'url' | 'number' | 'boolean' | 'csv' | 'json' | 'enum';
   required?: boolean;
-  default?: string;
+  default?: string | number | boolean;
   description?: string;
   example?: string;
   pattern?: string;
@@ -58,6 +59,7 @@ function getSchemaValidator(): ValidateFunction {
   const schema = JSON.parse(schemaContent);
 
   const ajv = new Ajv({ allErrors: true, strict: false });
+  addFormats(ajv);
   schemaValidator = ajv.compile(schema);
 
   return schemaValidator;
