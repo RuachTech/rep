@@ -159,6 +159,38 @@ describe('manifest', () => {
       expect(() => validateManifest(manifest)).not.toThrow();
     });
 
+    it('should accept boolean default values', () => {
+      const manifest = {
+        version: '0.1.0',
+        variables: {
+          COMING_SOON: {
+            tier: 'public',
+            type: 'boolean',
+            required: false,
+            default: false,
+          },
+        },
+      };
+
+      expect(() => validateManifest(manifest)).not.toThrow();
+    });
+
+    it('should accept number default values', () => {
+      const manifest = {
+        version: '0.1.0',
+        variables: {
+          MAX_RETRIES: {
+            tier: 'public',
+            type: 'number',
+            required: false,
+            default: 3,
+          },
+        },
+      };
+
+      expect(() => validateManifest(manifest)).not.toThrow();
+    });
+
     it('should accept settings object', () => {
       const manifest = {
         version: '0.1.0',

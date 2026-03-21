@@ -12,7 +12,7 @@ export interface ManifestVariable {
   tier: 'public' | 'sensitive' | 'server';
   type?: 'string' | 'url' | 'number' | 'boolean' | 'csv' | 'json' | 'enum';
   required?: boolean;
-  default?: string;
+  default?: string | number | boolean;
   description?: string;
   example?: string;
   pattern?: string;

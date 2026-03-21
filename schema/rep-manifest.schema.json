@@ -38,8 +38,8 @@
             "default": false
           },
           "default": {
-            "type": "string",
-            "description": "Default value if the environment variable is not set. Only valid for non-required variables."
+            "type": ["string", "number", "boolean"],
+            "description": "Default value if the environment variable is not set. Only valid for non-required variables. Non-string values are coerced to strings."
           },
           "description": {
             "type": "string",
