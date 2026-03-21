@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.14](https://github.com/RuachTech/rep/compare/cli-v0.1.13...cli-v0.1.14) (2026-03-21)
+
+
+### Bug Fixes
+
+* accept boolean and number types for manifest default field ([#44](https://github.com/RuachTech/rep/issues/44)) ([96e3ac4](https://github.com/RuachTech/rep/commit/96e3ac44ee133e077d9b00b140c3f00d246f34a4))
+
 ## [0.1.13](https://github.com/RuachTech/rep/compare/cli-v0.1.12...cli-v0.1.13) (2026-03-19)
 
 
