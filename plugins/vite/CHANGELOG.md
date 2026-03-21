@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.14](https://github.com/RuachTech/rep/compare/vite-v0.1.13...vite-v0.1.14) (2026-03-21)
+
+
+### Miscellaneous Chores
+
+* **vite:** Synchronize rep-packages versions
+
 ## [0.1.13](https://github.com/RuachTech/rep/compare/vite-v0.1.12...vite-v0.1.13) (2026-03-19)
 
 
