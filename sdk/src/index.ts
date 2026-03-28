@@ -44,7 +44,7 @@ interface SessionKeyResponse {
 type ChangeCallback = (newValue: string, oldValue: string | undefined) => void;
 type AnyChangeCallback = (key: string, newValue: string, oldValue: string | undefined) => void;
 
-class REPError extends Error {
+export class REPError extends Error {
   constructor(message: string) {
     super(`[REP] ${message}`);
     this.name = 'REPError';
