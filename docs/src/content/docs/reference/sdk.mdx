@@ -48,10 +48,25 @@ function getSecure(key: string): Promise<string>;
 
 **Returns:** `Promise<string>` — the decrypted value.
 
-**Throws:** `REPError` if the session key endpoint is unreachable, the key has expired, or decryption fails.
+**Throws:** `REPError` in the following cases:
+- The requested key does not exist in the sensitive payload
+- The session key endpoint is unreachable or returns a non-2xx status
+- The session key has expired (30s TTL)
+- Decryption fails (corrupted payload or mismatched key)
+
+Always wrap `getSecure()` in a try/catch:
 
 ```typescript
-const key = await rep.getSecure('ANALYTICS_KEY');
+import { rep, REPError } from '@rep-protocol/sdk';
+
+try {
+  const analyticsKey = await rep.getSecure('ANALYTICS_KEY');
+} catch (err) {
+  if (err instanceof REPError) {
+    // Key not found, endpoint unreachable, or decryption failed.
+    console.error(err.message);
+  }
+}
 ```
 
 <Aside>
