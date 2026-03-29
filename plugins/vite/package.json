@@ -1,6 +1,6 @@
 {
   "name": "@rep-protocol/vite",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Vite plugin for the Runtime Environment Protocol (REP). Injects REP environment variables during development without needing the Go gateway.",
   "author": "Ruach Tech",
   "license": "Apache-2.0",
