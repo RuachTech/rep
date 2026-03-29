@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.15](https://github.com/RuachTech/rep/compare/cli-v0.1.14...cli-v0.1.15) (2026-03-29)
+
+
+### Miscellaneous Chores
+
+* **cli:** Synchronize rep-packages versions
+
 ## [0.1.14](https://github.com/RuachTech/rep/compare/cli-v0.1.13...cli-v0.1.14) (2026-03-21)
 
 

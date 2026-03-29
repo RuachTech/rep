@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.15](https://github.com/RuachTech/rep/compare/sdk-v0.1.14...sdk-v0.1.15) (2026-03-29)
+
+
+### Bug Fixes
+
+* export REPError and document all getSecure() throw conditions ([#46](https://github.com/RuachTech/rep/issues/46)) ([fde97b8](https://github.com/RuachTech/rep/commit/fde97b80a8c983503bff81cf43c938d040ef65b2))
+
 ## [0.1.14](https://github.com/RuachTech/rep/compare/sdk-v0.1.13...sdk-v0.1.14) (2026-03-21)
 
 

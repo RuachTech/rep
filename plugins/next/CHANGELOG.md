@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.15](https://github.com/RuachTech/rep/compare/next-v0.1.14...next-v0.1.15) (2026-03-29)
+
+
+### Miscellaneous Chores
+
+* **next:** Synchronize rep-packages versions
+
 ## [0.1.14](https://github.com/RuachTech/rep/compare/next-v0.1.13...next-v0.1.14) (2026-03-21)
 
 

@@ -1,11 +1,11 @@
 {
-  "sdk": "0.1.14",
-  "cli": "0.1.14",
-  "codemod": "0.1.14",
-  "adapters/react": "0.1.14",
-  "adapters/vue": "0.1.14",
-  "adapters/svelte": "0.1.14",
-  "plugins/vite": "0.1.14",
-  "plugins/next": "0.1.14",
+  "sdk": "0.1.15",
+  "cli": "0.1.15",
+  "codemod": "0.1.15",
+  "adapters/react": "0.1.15",
+  "adapters/vue": "0.1.15",
+  "adapters/svelte": "0.1.15",
+  "plugins/vite": "0.1.15",
+  "plugins/next": "0.1.15",
   "gateway": "0.1.5"
 }
