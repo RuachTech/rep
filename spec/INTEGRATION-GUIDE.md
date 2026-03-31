@@ -4,7 +4,6 @@
 Document:  REP Integration Guide
 Version:   0.1.0
 Status:    Active
-Authors:   Olamide Adebayo (Ruach Tech)
 Created:   2026-02-18
 ```
 
