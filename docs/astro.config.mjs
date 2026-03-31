@@ -1,8 +1,14 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
+const siteUrl = 'https://rep-protocol.dev';
+const ogImagePath = '/og-image.png';
+const ogImageUrl = `${siteUrl}${ogImagePath}`;
+const ogImageAlt =
+  'REP social card showing Runtime Environment Protocol for secure runtime environment variables in browser apps';
+
 export default defineConfig({
-  site: 'https://rep-protocol.dev',
+  site: siteUrl,
   integrations: [
     starlight({
       title: 'REP',
@@ -46,7 +52,42 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             property: 'og:image',
-            content: 'https://rep-protocol.dev/og-image.png',
+            content: ogImageUrl,
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            property: 'og:image:secure_url',
+            content: ogImageUrl,
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            property: 'og:image:type',
+            content: 'image/png',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            property: 'og:image:width',
+            content: '1200',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            property: 'og:image:height',
+            content: '630',
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            property: 'og:image:alt',
+            content: ogImageAlt,
           },
         },
         {
@@ -60,7 +101,21 @@ export default defineConfig({
           tag: 'meta',
           attrs: {
             name: 'twitter:image',
-            content: 'https://rep-protocol.dev/og-image.png',
+            content: ogImageUrl,
+          },
+        },
+        {
+          tag: 'meta',
+          attrs: {
+            name: 'twitter:image:alt',
+            content: ogImageAlt,
+          },
+        },
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'image_src',
+            href: ogImageUrl,
           },
         },
         {
