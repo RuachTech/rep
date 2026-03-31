@@ -4,7 +4,6 @@
 Document:  REP Security Model
 Version:   0.1.0
 Status:    Active
-Authors:   Olamide Olayinka (Ruach Tech)
 Created:   2026-02-18
 ```
 
