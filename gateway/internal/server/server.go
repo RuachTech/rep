@@ -123,6 +123,16 @@ func New(cfg *config.Config, logger *slog.Logger, version string) (*Server, erro
 	// Create the injection middleware wrapping the upstream.
 	s.injector = inject.New(upstream, scriptTag, logger)
 
+	// Enable response caching when it's safe:
+	//   - hot-reload off (file content can change at runtime when on)
+	//   - no SENSITIVE vars present (per REP-RFC-0001 §4.3, the gateway
+	//     MUST NOT cache injected HTML if the encrypted blob may rotate)
+	if !cfg.HotReload && len(vars.Sensitive) == 0 {
+		s.injector.EnableCache()
+		logger.Info("rep.inject.cache_enabled",
+			"reason", "no SENSITIVE vars and hot-reload disabled")
+	}
+
 	// Step 9: Create hot reload hub if enabled.
 	if cfg.HotReload {
 		s.hotReloadHub = hotreload.NewHub(logger)
