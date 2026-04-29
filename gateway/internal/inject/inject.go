@@ -113,11 +113,15 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	clientAccepts := r.Header.Get("Accept-Encoding")
 	r.Header.Del("Accept-Encoding")
 
-	// Cache lookup — only for GET, only when caching is enabled.
-	if r.Method == http.MethodGet {
-		if entry := m.cacheGet(r.URL.Path); entry != nil {
+	// Cache lookup — only for GET, only when caching is enabled, only for
+	// requests that don't carry per-user identity (Cookie/Authorization).
+	// The cache is keyed by request URI (path + query) so URLs that vary
+	// by query don't collide.
+	cacheKey := r.URL.RequestURI()
+	if r.Method == http.MethodGet && requestIsCacheable(r) {
+		if entry := m.cacheGet(cacheKey); entry != nil {
 			m.writeCached(w, entry, clientAccepts)
-			m.logger.Debug("rep.inject.cache_hit", "path", r.URL.Path)
+			m.logger.Debug("rep.inject.cache_hit", "path", cacheKey)
 			return
 		}
 	}
@@ -132,6 +136,19 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// Serve the request to the upstream handler.
 	m.next.ServeHTTP(rec, r)
+
+	// Statuses that MUST NOT carry a body (RFC 9110 §15) — pass the
+	// upstream response through unmodified. Injecting into a 304 / 204 /
+	// 1xx would generate a non-empty body and a Content-Length, violating
+	// HTTP semantics and breaking downstream conditional-request flows.
+	if isBodylessStatus(rec.statusCode) {
+		copyHeaders(w.Header(), rec.header)
+		w.WriteHeader(rec.statusCode)
+		if _, err := w.Write(rec.body.Bytes()); err != nil {
+			m.logger.Debug("rep.inject.write_error", "path", r.URL.Path, "error", err)
+		}
+		return
+	}
 
 	// Check if the response is HTML.
 	contentType := rec.header.Get("Content-Type")
@@ -193,21 +210,33 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build the response headers we'll send to the client. Strip
-	// Content-Encoding/Length (we own them now) and announce that the
-	// body varies on Accept-Encoding so caches don't serve the wrong form.
+	// Content-Encoding/Length (we own them now). Strip ETag and
+	// Last-Modified because the upstream computed them for the
+	// pre-injection body — keeping them would mislead conditional-request
+	// flows. Announce that the body varies on Accept-Encoding so caches
+	// don't serve the wrong form.
 	respHeader := make(http.Header)
 	copyHeaders(respHeader, rec.header)
 	respHeader.Del("Content-Encoding")
 	respHeader.Del("Content-Length")
+	respHeader.Del("ETag")
+	respHeader.Del("Last-Modified")
 	addVary(respHeader, "Accept-Encoding")
 
-	// Cache eligibility: GET, 200 OK, no Set-Cookie. The Set-Cookie check
-	// keeps per-user response data out of the cache; for static-export
-	// workflows this is rare but cheap to guard against.
+	// Cache eligibility — many guards because the cache is keyed by URI
+	// only and content can be per-user in proxy mode:
+	//
+	//   - GET only
+	//   - 200 OK only
+	//   - request has no Cookie/Authorization (would otherwise be per-user)
+	//   - response has no Set-Cookie (per-user state being established)
+	//   - response is not marked Cache-Control: private/no-store/no-cache
+	//   - response doesn't Vary by Cookie/Authorization
 	if r.Method == http.MethodGet &&
 		rec.statusCode == http.StatusOK &&
-		len(rec.header.Values("Set-Cookie")) == 0 {
-		m.cachePut(r.URL.Path, &cacheEntry{
+		requestIsCacheable(r) &&
+		responseIsCacheable(rec.header) {
+		m.cachePut(cacheKey, &cacheEntry{
 			statusCode: rec.statusCode,
 			headers:    respHeader.Clone(),
 			identity:   injected,
@@ -503,6 +532,61 @@ func isInsideComment(html []byte, pos int, open, close []byte) bool {
 		i = end
 	}
 	return false
+}
+
+// isBodylessStatus reports whether an HTTP status code MUST NOT carry a
+// response body, per RFC 9110 §15. The middleware bypasses injection,
+// compression, and caching for these so we don't fabricate a body that
+// breaks downstream conditional-request flows.
+func isBodylessStatus(status int) bool {
+	if status >= 100 && status < 200 {
+		return true
+	}
+	switch status {
+	case http.StatusNoContent, http.StatusNotModified:
+		return true
+	}
+	return false
+}
+
+// requestIsCacheable reports whether a request can safely use the path-
+// keyed in-memory cache. Skipped if the request carries identity headers
+// that would normally personalise the response.
+func requestIsCacheable(r *http.Request) bool {
+	if r.Header.Get("Cookie") != "" {
+		return false
+	}
+	if r.Header.Get("Authorization") != "" {
+		return false
+	}
+	return true
+}
+
+// responseIsCacheable reports whether the upstream response can be
+// stored in the in-memory cache. Honours upstream Cache-Control
+// directives and rejects responses that vary by per-user headers.
+func responseIsCacheable(h http.Header) bool {
+	for _, v := range h.Values("Set-Cookie") {
+		_ = v
+		return false // any Set-Cookie disqualifies
+	}
+	for _, v := range h.Values("Cache-Control") {
+		for _, directive := range strings.Split(v, ",") {
+			d := strings.ToLower(strings.TrimSpace(directive))
+			if d == "private" || d == "no-store" || d == "no-cache" {
+				return false
+			}
+		}
+	}
+	for _, v := range h.Values("Vary") {
+		for _, token := range strings.Split(v, ",") {
+			t := strings.ToLower(strings.TrimSpace(token))
+			if t == "cookie" || t == "authorization" || t == "*" {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // isWebSocketUpgrade reports whether the request is a WebSocket upgrade.

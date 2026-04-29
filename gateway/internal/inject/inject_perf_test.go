@@ -293,6 +293,180 @@ func TestMiddleware_CacheSkipsNon200(t *testing.T) {
 	}
 }
 
+func TestMiddleware_CacheKeyIncludesQueryString(t *testing.T) {
+	var calls int32
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><head></head><body>` + r.URL.RawQuery + `</body></html>`))
+	})
+
+	m := New(upstream, testScriptTag, slog.Default())
+	m.EnableCache()
+
+	for _, q := range []string{"a=1", "a=2", "a=1"} {
+		rec := httptest.NewRecorder()
+		m.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/page?"+q, nil))
+	}
+
+	// Two distinct queries → two upstream calls. The third repeats `a=1`
+	// so it should hit the cache.
+	if got := atomic.LoadInt32(&calls); got != 2 {
+		t.Errorf("cache key should distinguish query strings: expected 2 upstream calls, got %d", got)
+	}
+}
+
+func TestMiddleware_CacheSkipsCookieRequests(t *testing.T) {
+	var calls int32
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><head></head><body></body></html>`))
+	})
+
+	m := New(upstream, testScriptTag, slog.Default())
+	m.EnableCache()
+
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Cookie", "session=abc")
+		rec := httptest.NewRecorder()
+		m.ServeHTTP(rec, req)
+	}
+
+	if got := atomic.LoadInt32(&calls); got != 3 {
+		t.Errorf("requests with Cookie must not be cached: expected 3 upstream calls, got %d", got)
+	}
+}
+
+func TestMiddleware_CacheSkipsAuthorizationRequests(t *testing.T) {
+	var calls int32
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte(`<html><head></head><body></body></html>`))
+	})
+
+	m := New(upstream, testScriptTag, slog.Default())
+	m.EnableCache()
+
+	for i := 0; i < 3; i++ {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Authorization", "Bearer xyz")
+		rec := httptest.NewRecorder()
+		m.ServeHTTP(rec, req)
+	}
+
+	if got := atomic.LoadInt32(&calls); got != 3 {
+		t.Errorf("requests with Authorization must not be cached: expected 3 upstream calls, got %d", got)
+	}
+}
+
+func TestMiddleware_CacheSkipsCacheControlPrivate(t *testing.T) {
+	cases := []string{"private", "no-store", "no-cache", "private, max-age=60"}
+	for _, cc := range cases {
+		t.Run(cc, func(t *testing.T) {
+			var calls int32
+			upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				atomic.AddInt32(&calls, 1)
+				w.Header().Set("Content-Type", "text/html")
+				w.Header().Set("Cache-Control", cc)
+				_, _ = w.Write([]byte(`<html><head></head><body></body></html>`))
+			})
+
+			m := New(upstream, testScriptTag, slog.Default())
+			m.EnableCache()
+
+			for i := 0; i < 2; i++ {
+				rec := httptest.NewRecorder()
+				m.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+			}
+
+			if got := atomic.LoadInt32(&calls); got != 2 {
+				t.Errorf("Cache-Control %q should disable caching, got %d upstream calls", cc, got)
+			}
+		})
+	}
+}
+
+func TestMiddleware_CacheSkipsVaryByCookie(t *testing.T) {
+	var calls int32
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&calls, 1)
+		w.Header().Set("Content-Type", "text/html")
+		w.Header().Set("Vary", "Origin, Cookie")
+		_, _ = w.Write([]byte(`<html><head></head><body></body></html>`))
+	})
+
+	m := New(upstream, testScriptTag, slog.Default())
+	m.EnableCache()
+
+	for i := 0; i < 2; i++ {
+		rec := httptest.NewRecorder()
+		m.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	}
+
+	if got := atomic.LoadInt32(&calls); got != 2 {
+		t.Errorf("Vary by Cookie should disable caching: expected 2 upstream calls, got %d", got)
+	}
+}
+
+func TestMiddleware_StripsETagAndLastModified(t *testing.T) {
+	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.Header().Set("ETag", `"upstream-etag-abc"`)
+		w.Header().Set("Last-Modified", "Wed, 21 Oct 2026 07:28:00 GMT")
+		_, _ = w.Write([]byte(`<html><head></head><body></body></html>`))
+	})
+
+	m := New(upstream, testScriptTag, slog.Default())
+	rec := httptest.NewRecorder()
+	m.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+	if got := rec.Header().Get("ETag"); got != "" {
+		t.Errorf("ETag should be stripped (the body has been modified), got %q", got)
+	}
+	if got := rec.Header().Get("Last-Modified"); got != "" {
+		t.Errorf("Last-Modified should be stripped (the body has been modified), got %q", got)
+	}
+}
+
+func TestMiddleware_BodylessStatusPassThrough(t *testing.T) {
+	cases := []int{
+		http.StatusContinue,            // 100
+		http.StatusNoContent,           // 204
+		http.StatusNotModified,         // 304
+		http.StatusSwitchingProtocols,  // 101 (1xx range)
+	}
+	for _, status := range cases {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/html") // tempting to inject!
+				w.Header().Set("ETag", `"keep-me"`)
+				w.WriteHeader(status)
+				// No body — bodyless statuses must not write one.
+			})
+
+			m := New(upstream, testScriptTag, slog.Default())
+			rec := httptest.NewRecorder()
+			m.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+
+			if rec.Code != status {
+				t.Errorf("status passed through wrong: got %d, want %d", rec.Code, status)
+			}
+			if rec.Body.Len() != 0 {
+				t.Errorf("bodyless status %d gained a body of %d bytes", status, rec.Body.Len())
+			}
+			// Validators on bodyless responses should pass through untouched
+			// (they describe the upstream's representation, which we didn't
+			// modify because we didn't write a body).
+			if got := rec.Header().Get("ETag"); got != `"keep-me"` {
+				t.Errorf("bodyless response should preserve upstream ETag, got %q", got)
+			}
+		})
+	}
+}
+
 func TestMiddleware_VaryHeaderPresent(t *testing.T) {
 	upstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
