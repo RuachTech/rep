@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/RuachTech/rep/compare/gateway/v0.1.5...gateway/v0.1.6) (2026-04-29)
+
+
+### Features
+
+* **gateway:** gzip injected HTML and cache when no SENSITIVE vars ([#49](https://github.com/RuachTech/rep/issues/49)) ([83b5e58](https://github.com/RuachTech/rep/commit/83b5e583ac8280431c560a82556ce6d6f58cb69e))
+
 ## [0.1.5](https://github.com/RuachTech/rep/compare/gateway/v0.1.4...gateway/v0.1.5) (2026-03-16)
 
 
