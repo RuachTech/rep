@@ -16,6 +16,17 @@ import (
 	"sync"
 )
 
+const (
+	// compressMinBytes is the smallest response body we'll bother gzipping.
+	// Below this, gzip overhead can exceed savings.
+	compressMinBytes = 1024
+
+	// cacheMaxEntries bounds the in-memory cache so a runaway URL space
+	// can't blow up memory. Static exports rarely exceed a few hundred
+	// HTML routes, so this is generous.
+	cacheMaxEntries = 1000
+)
+
 // Middleware wraps an http.Handler and injects the REP script tag into HTML responses.
 type Middleware struct {
 	// next is the upstream handler (reverse proxy or file server).
@@ -28,9 +39,27 @@ type Middleware struct {
 	mu sync.RWMutex
 
 	logger *slog.Logger
+
+	// cache stores fully-processed (injected, optionally gzipped) responses
+	// keyed by request path. nil means caching is disabled — the default.
+	// Per REP-RFC-0001 §4.3 the gateway MUST NOT cache when SENSITIVE vars
+	// are present (the encrypted blob may rotate), so the server only opts
+	// in via EnableCache when it's safe.
+	cache   map[string]*cacheEntry
+	cacheMu sync.RWMutex
 }
 
-// New creates a new injection middleware.
+// cacheEntry is a fully-processed response stored under a path key.
+// Both encodings are pre-computed so cache hits never re-compress.
+type cacheEntry struct {
+	statusCode int
+	headers    http.Header
+	identity   []byte // pre-injected identity-encoded bytes
+	gzipped    []byte // pre-compressed bytes (nil if compression wasn't worthwhile)
+}
+
+// New creates a new injection middleware. Caching is off by default;
+// callers opt in via EnableCache when no SENSITIVE variables are present.
 func New(next http.Handler, scriptTag string, logger *slog.Logger) *Middleware {
 	return &Middleware{
 		next:      next,
@@ -39,11 +68,32 @@ func New(next http.Handler, scriptTag string, logger *slog.Logger) *Middleware {
 	}
 }
 
-// UpdateScriptTag replaces the script tag (used during hot reload).
+// EnableCache turns on response caching for processed HTML.
+//
+// Per REP-RFC-0001 §4.3, the gateway MUST NOT cache injected HTML when
+// SENSITIVE variables are present (the encrypted blob may rotate). Callers
+// must only enable this when no SENSITIVE vars are configured, and should
+// also leave it off when hot-reload is active.
+func (m *Middleware) EnableCache() {
+	m.cacheMu.Lock()
+	if m.cache == nil {
+		m.cache = make(map[string]*cacheEntry)
+	}
+	m.cacheMu.Unlock()
+}
+
+// UpdateScriptTag replaces the script tag (used during hot reload) and
+// invalidates any cached responses (they contain the previous tag).
 func (m *Middleware) UpdateScriptTag(scriptTag string) {
 	m.mu.Lock()
 	m.scriptTag = []byte(scriptTag)
 	m.mu.Unlock()
+
+	m.cacheMu.Lock()
+	if m.cache != nil {
+		m.cache = make(map[string]*cacheEntry)
+	}
+	m.cacheMu.Unlock()
 }
 
 // ServeHTTP intercepts HTML responses and injects the REP payload.
@@ -56,10 +106,21 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Strip Accept-Encoding from the request so the upstream always responds
-	// with identity encoding. This ensures we can reliably search for </head>
-	// in the response body for injection.
+	// Capture the client's preferred response encoding before we strip it.
+	// We strip Accept-Encoding so the upstream always returns identity (we
+	// need to byte-search for </head>); on the way back out we honour the
+	// client's original preference and re-compress if appropriate.
+	clientAccepts := r.Header.Get("Accept-Encoding")
 	r.Header.Del("Accept-Encoding")
+
+	// Cache lookup — only for GET, only when caching is enabled.
+	if r.Method == http.MethodGet {
+		if entry := m.cacheGet(r.URL.Path); entry != nil {
+			m.writeCached(w, entry, clientAccepts)
+			m.logger.Debug("rep.inject.cache_hit", "path", r.URL.Path)
+			return
+		}
+	}
 
 	// Wrap the response writer to capture the response.
 	rec := &responseRecorder{
@@ -114,16 +175,60 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Inject the REP script tag into the HTML.
 	injected := injectIntoHTML(body, tag)
 
-	copyHeaders(w.Header(), rec.header)
+	// Pre-compute the gzipped variant if the response is large enough.
+	// We compute it eagerly so cache hits for clients that DO want gzip
+	// don't pay the compression cost on every hit.
+	var gzipped []byte
+	if len(injected) >= compressMinBytes {
+		var err error
+		gzipped, err = gzipCompress(injected)
+		if err != nil {
+			m.logger.Debug("rep.inject.gzip_error", "path", r.URL.Path, "error", err)
+			gzipped = nil
+		}
+	}
 
-	// Update Content-Length to reflect the injected content.
-	w.Header().Set("Content-Length", strconv.Itoa(len(injected)))
+	// Build the response headers we'll send to the client. Strip
+	// Content-Encoding/Length (we own them now) and announce that the
+	// body varies on Accept-Encoding so caches don't serve the wrong form.
+	respHeader := make(http.Header)
+	copyHeaders(respHeader, rec.header)
+	respHeader.Del("Content-Encoding")
+	respHeader.Del("Content-Length")
+	addVary(respHeader, "Accept-Encoding")
 
-	// Remove Content-Encoding since we've modified the body.
-	w.Header().Del("Content-Encoding")
+	// Cache eligibility: GET, 200 OK, no Set-Cookie. The Set-Cookie check
+	// keeps per-user response data out of the cache; for static-export
+	// workflows this is rare but cheap to guard against.
+	if r.Method == http.MethodGet &&
+		rec.statusCode == http.StatusOK &&
+		len(rec.header.Values("Set-Cookie")) == 0 {
+		m.cachePut(r.URL.Path, &cacheEntry{
+			statusCode: rec.statusCode,
+			headers:    respHeader.Clone(),
+			identity:   injected,
+			gzipped:    gzipped,
+		})
+	}
 
+	// Pick the encoding the client wants and ship it.
+	outBody, outEncoding := pickVariant(injected, gzipped, clientAccepts)
+	if outEncoding != "" {
+		respHeader.Set("Content-Encoding", outEncoding)
+	}
+	respHeader.Set("Content-Length", strconv.Itoa(len(outBody)))
+
+	dst := w.Header()
+	for k := range dst {
+		dst.Del(k)
+	}
+	for k, values := range respHeader {
+		for _, value := range values {
+			dst.Add(k, value)
+		}
+	}
 	w.WriteHeader(rec.statusCode)
-	if _, err := w.Write(injected); err != nil {
+	if _, err := w.Write(outBody); err != nil {
 		m.logger.Debug("rep.inject.write_error", "path", r.URL.Path, "error", err)
 	}
 
@@ -131,7 +236,119 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"path", r.URL.Path,
 		"original_size", len(body),
 		"injected_size", len(injected),
+		"sent_size", len(outBody),
+		"encoding", outEncoding,
 	)
+}
+
+// writeCached emits a cached entry, picking identity or gzip per the
+// client's Accept-Encoding.
+func (m *Middleware) writeCached(w http.ResponseWriter, entry *cacheEntry, clientAccepts string) {
+	body, encoding := pickVariant(entry.identity, entry.gzipped, clientAccepts)
+
+	dst := w.Header()
+	for k := range dst {
+		dst.Del(k)
+	}
+	for k, values := range entry.headers {
+		for _, value := range values {
+			dst.Add(k, value)
+		}
+	}
+	if encoding != "" {
+		dst.Set("Content-Encoding", encoding)
+	}
+	dst.Set("Content-Length", strconv.Itoa(len(body)))
+	w.WriteHeader(entry.statusCode)
+	_, _ = w.Write(body)
+}
+
+func (m *Middleware) cacheGet(path string) *cacheEntry {
+	m.cacheMu.RLock()
+	defer m.cacheMu.RUnlock()
+	if m.cache == nil {
+		return nil
+	}
+	return m.cache[path]
+}
+
+func (m *Middleware) cachePut(path string, entry *cacheEntry) {
+	m.cacheMu.Lock()
+	defer m.cacheMu.Unlock()
+	if m.cache == nil {
+		return
+	}
+	if len(m.cache) >= cacheMaxEntries {
+		// Bounded; drop new additions until the next UpdateScriptTag clears.
+		// In practice this never trips for static exports.
+		return
+	}
+	m.cache[path] = entry
+}
+
+// pickVariant chooses identity or gzipped based on the client's Accept-Encoding.
+// Falls back to identity if we didn't pre-compute gzip for this response.
+func pickVariant(identity, gzipped []byte, accept string) (body []byte, encoding string) {
+	if len(gzipped) > 0 && acceptsGzip(accept) {
+		return gzipped, "gzip"
+	}
+	return identity, ""
+}
+
+// acceptsGzip parses Accept-Encoding and returns true if gzip is acceptable.
+// Honours `q=0` rejections and the `*` wildcard.
+func acceptsGzip(accept string) bool {
+	if accept == "" {
+		return false
+	}
+	for _, part := range strings.Split(accept, ",") {
+		token := strings.TrimSpace(part)
+		if token == "" {
+			continue
+		}
+		name, params, _ := strings.Cut(token, ";")
+		name = strings.ToLower(strings.TrimSpace(name))
+		if name != "gzip" && name != "*" {
+			continue
+		}
+		q := 1.0
+		for _, p := range strings.Split(params, ";") {
+			p = strings.TrimSpace(p)
+			if k, v, ok := strings.Cut(p, "="); ok && strings.EqualFold(strings.TrimSpace(k), "q") {
+				if parsed, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err == nil {
+					q = parsed
+				}
+			}
+		}
+		if q > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// addVary appends a token to the Vary header if it isn't already present.
+func addVary(h http.Header, value string) {
+	for _, v := range h.Values("Vary") {
+		if strings.EqualFold(strings.TrimSpace(v), value) {
+			return
+		}
+	}
+	h.Add("Vary", value)
+}
+
+// gzipCompress returns the gzip-encoded form of body.
+func gzipCompress(body []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	w := gzip.NewWriter(&buf)
+	if _, err := w.Write(body); err != nil {
+		_ = w.Close()
+		return nil, err
+	}
+	if err := w.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 // decompressBody decompresses a response body based on Content-Encoding.
