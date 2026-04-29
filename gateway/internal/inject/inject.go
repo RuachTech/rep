@@ -175,16 +175,20 @@ func (m *Middleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Inject the REP script tag into the HTML.
 	injected := injectIntoHTML(body, tag)
 
-	// Pre-compute the gzipped variant if the response is large enough.
-	// We compute it eagerly so cache hits for clients that DO want gzip
-	// don't pay the compression cost on every hit.
+	// Compute the gzipped variant only when we'll actually use it:
+	//   - this client accepts gzip (we'll send it now), OR
+	//   - caching is enabled (we may send it to a future client that does).
+	// Otherwise the work would be thrown away.
 	var gzipped []byte
 	if len(injected) >= compressMinBytes {
-		var err error
-		gzipped, err = gzipCompress(injected)
-		if err != nil {
-			m.logger.Debug("rep.inject.gzip_error", "path", r.URL.Path, "error", err)
-			gzipped = nil
+		needsGzip := acceptsGzip(clientAccepts) || m.cacheActive()
+		if needsGzip {
+			var err error
+			gzipped, err = gzipCompress(injected)
+			if err != nil {
+				m.logger.Debug("rep.inject.gzip_error", "path", r.URL.Path, "error", err)
+				gzipped = nil
+			}
 		}
 	}
 
@@ -263,6 +267,13 @@ func (m *Middleware) writeCached(w http.ResponseWriter, entry *cacheEntry, clien
 	_, _ = w.Write(body)
 }
 
+// cacheActive reports whether caching is enabled.
+func (m *Middleware) cacheActive() bool {
+	m.cacheMu.RLock()
+	defer m.cacheMu.RUnlock()
+	return m.cache != nil
+}
+
 func (m *Middleware) cacheGet(path string) *cacheEntry {
 	m.cacheMu.RLock()
 	defer m.cacheMu.RUnlock()
@@ -296,11 +307,22 @@ func pickVariant(identity, gzipped []byte, accept string) (body []byte, encoding
 }
 
 // acceptsGzip parses Accept-Encoding and returns true if gzip is acceptable.
-// Honours `q=0` rejections and the `*` wildcard.
+//
+// Per RFC 9110 §12.5.3, an explicit coding parameter takes precedence over
+// the `*` wildcard. So `gzip;q=0, *;q=0.5` rejects gzip even though `*`
+// would otherwise allow it.
 func acceptsGzip(accept string) bool {
 	if accept == "" {
 		return false
 	}
+
+	var (
+		explicitGzipSeen bool
+		explicitGzipQ    float64
+		wildcardSeen     bool
+		wildcardQ        float64
+	)
+
 	for _, part := range strings.Split(accept, ",") {
 		token := strings.TrimSpace(part)
 		if token == "" {
@@ -320,18 +342,34 @@ func acceptsGzip(accept string) bool {
 				}
 			}
 		}
-		if q > 0 {
-			return true
+		if name == "gzip" {
+			explicitGzipSeen = true
+			explicitGzipQ = q
+		} else { // "*"
+			wildcardSeen = true
+			wildcardQ = q
 		}
 	}
-	return false
+
+	switch {
+	case explicitGzipSeen:
+		return explicitGzipQ > 0
+	case wildcardSeen:
+		return wildcardQ > 0
+	default:
+		return false
+	}
 }
 
 // addVary appends a token to the Vary header if it isn't already present.
+// Handles both repeated `Vary:` headers and single comma-separated values
+// (`Vary: Origin, Accept-Encoding`), so we never duplicate a token.
 func addVary(h http.Header, value string) {
 	for _, v := range h.Values("Vary") {
-		if strings.EqualFold(strings.TrimSpace(v), value) {
-			return
+		for _, existing := range strings.Split(v, ",") {
+			if strings.EqualFold(strings.TrimSpace(existing), value) {
+				return
+			}
 		}
 	}
 	h.Add("Vary", value)

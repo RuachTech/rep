@@ -312,22 +312,86 @@ func TestMiddleware_VaryHeaderPresent(t *testing.T) {
 
 func TestAcceptsGzip(t *testing.T) {
 	cases := map[string]bool{
-		"":                        false,
-		"identity":                false,
-		"gzip":                    true,
-		"gzip, deflate":           true,
-		"deflate, gzip;q=0.8":     true,
-		"gzip;q=0":                false,
-		"identity, gzip ; q = 0":  false,
-		"*":                       true,
-		"*;q=0":                   false,
-		"deflate, *;q=0.5":        true,
+		"":                       false,
+		"identity":               false,
+		"gzip":                   true,
+		"gzip, deflate":          true,
+		"deflate, gzip;q=0.8":    true,
+		"gzip;q=0":               false,
+		"identity, gzip ; q = 0": false,
+		"*":                      true,
+		"*;q=0":                  false,
+		"deflate, *;q=0.5":       true,
+		// RFC 9110 §12.5.3: an explicit coding parameter takes precedence
+		// over `*`. These two cases caught a regression early on.
+		"gzip;q=0, *;q=0.5": false, // explicit gzip rejection wins
+		"*;q=0, gzip":       true,  // explicit gzip allowance wins
 	}
 	for header, want := range cases {
 		got := acceptsGzip(header)
 		if got != want {
 			t.Errorf("acceptsGzip(%q) = %v, want %v", header, got, want)
 		}
+	}
+}
+
+func TestAddVary_DoesNotDuplicate(t *testing.T) {
+	cases := []struct {
+		name    string
+		initial []string // existing Vary header values (multiple = repeated header)
+		add     string
+		want    []string
+	}{
+		{
+			name:    "empty",
+			initial: nil,
+			add:     "Accept-Encoding",
+			want:    []string{"Accept-Encoding"},
+		},
+		{
+			name:    "single matching value",
+			initial: []string{"Accept-Encoding"},
+			add:     "Accept-Encoding",
+			want:    []string{"Accept-Encoding"},
+		},
+		{
+			name:    "comma-separated existing",
+			initial: []string{"Origin, Accept-Encoding"},
+			add:     "Accept-Encoding",
+			want:    []string{"Origin, Accept-Encoding"},
+		},
+		{
+			name:    "case-insensitive match",
+			initial: []string{"origin, accept-encoding"},
+			add:     "Accept-Encoding",
+			want:    []string{"origin, accept-encoding"},
+		},
+		{
+			name:    "different value adds",
+			initial: []string{"Origin"},
+			add:     "Accept-Encoding",
+			want:    []string{"Origin", "Accept-Encoding"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := http.Header{}
+			for _, v := range tc.initial {
+				h.Add("Vary", v)
+			}
+			addVary(h, tc.add)
+
+			got := h.Values("Vary")
+			if len(got) != len(tc.want) {
+				t.Fatalf("Vary header count = %d, want %d (got %v)", len(got), len(tc.want), got)
+			}
+			for i, want := range tc.want {
+				if got[i] != want {
+					t.Errorf("Vary[%d] = %q, want %q", i, got[i], want)
+				}
+			}
+		})
 	}
 }
 
