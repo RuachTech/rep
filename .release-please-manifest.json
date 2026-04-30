@@ -7,5 +7,5 @@
   "adapters/svelte": "0.1.15",
   "plugins/vite": "0.1.15",
   "plugins/next": "0.1.15",
-  "gateway": "0.1.5"
+  "gateway": "0.1.6"
 }
