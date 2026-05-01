@@ -153,7 +153,7 @@ All npm packages share a **single version number** and are released together usi
 
 ### Gateway Versioning
 
-The Go gateway is versioned independently via `gateway/VERSION` and released through GoReleaser when a `gateway/v*` tag is pushed.
+The Go gateway is versioned independently via `gateway/version.txt` and released through GoReleaser when a `gateway/v*` tag is pushed.
 
 ## Pull Request Guidelines
 
