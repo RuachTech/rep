@@ -53,7 +53,7 @@
       "separate-pull-requests": true,
       "include-component-in-tag": true,
       "tag-separator": "/",
-        "extra-files": [
+      "extra-files": [
         "version.txt",
         {
           "type": "json",
