@@ -1,6 +1,6 @@
 # REP Gateway — Build & development targets.
 
-VERSION ?= $(shell cat VERSION 2>/dev/null || echo "0.1.0-dev")
+VERSION ?= $(shell cat version.txt 2>/dev/null || echo "0.1.0-dev")
 BINARY  := rep-gateway
 GOFLAGS := -ldflags="-s -w -X main.version=$(VERSION)" -trimpath
 

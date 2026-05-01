@@ -27,7 +27,7 @@ RUN go mod download
 # Copy source and build.
 COPY . .
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build \
-    -ldflags="-s -w -X main.version=$(cat VERSION 2>/dev/null || echo 0.1.0)" \
+    -ldflags="-s -w -X main.version=$(cat version.txt 2>/dev/null || echo 0.1.0)" \
     -trimpath \
     -o /rep-gateway \
     ./cmd/rep-gateway
