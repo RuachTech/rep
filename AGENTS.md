@@ -58,7 +58,7 @@ rep/
 │   ├── .goreleaser.yml                # Multi-platform release config
 │   ├── Dockerfile                     # Multi-stage, FROM scratch final
 │   ├── Makefile
-│   ├── version.txt                    # "0.1.5"
+│   ├── version.txt                    # "0.1.6"
 │   ├── go.mod                         # Go 1.24.5, zero external deps
 │   ├── cmd/rep-gateway/
 │   │   └── main.go                    # Entrypoint: flags, signals, graceful shutdown
