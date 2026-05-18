@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/RuachTech/rep/compare/gateway/v0.1.6...gateway/v0.1.7) (2026-05-18)
+
+
+### Bug Fixes
+
+* sync gateway/version.txt to 0.1.6 ([#52](https://github.com/RuachTech/rep/issues/52)) ([6dcf724](https://github.com/RuachTech/rep/commit/6dcf72442b3b360c3a46345ed01d51a8a57fd44e))
+
 ## [0.1.6](https://github.com/RuachTech/rep/compare/gateway/v0.1.5...gateway/v0.1.6) (2026-04-29)
 
 
