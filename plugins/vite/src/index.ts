@@ -1,27 +1,26 @@
-import { resolve, dirname } from 'node:path';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import type { Plugin, ViteDevServer, HtmlTagDescriptor } from 'vite';
 import { generateKeys, type Keys } from './crypto.js';
 import { readAndClassify, type ClassifiedVars } from './env.js';
 import { scanValue } from './guardrails.js';
 import { buildPayload, type PayloadResult } from './payload.js';
 
+// Injected at build time by tsup (see tsup.config.ts). Reading package.json at
+// runtime via import.meta.url is unreliable here: consumers import this plugin
+// inside vite.config.ts, which Vite bundles with esbuild — that rewrites
+// import.meta.url, so the runtime read fails and the version falls back to
+// 0.0.0. Baking the version in at build time avoids that entirely.
+declare const __REP_VITE_VERSION__: string;
+
+function getPackageVersion(): string {
+  return typeof __REP_VITE_VERSION__ === 'string' ? __REP_VITE_VERSION__ : '0.0.0';
+}
+
 export interface RepPluginOptions {
   /** Path to env file, relative to project root. Default: '.env.local' */
   env?: string;
   /** Enable strict mode — guardrail warnings become errors. Default: false */
   strict?: boolean;
-}
-
-function getPackageVersion(): string {
-  try {
-    const pkgPath = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'));
-    return pkg.version;
-  } catch {
-    return '0.0.0';
-  }
 }
 
 export function repPlugin(options: RepPluginOptions = {}): Plugin {
