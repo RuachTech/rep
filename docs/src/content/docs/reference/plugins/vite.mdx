@@ -1,0 +1,62 @@
+---
+title: Vite Plugin Reference — @rep-protocol/vite
+description: API reference for the REP Vite plugin. repPlugin() options, dev-mode behavior, the /rep/session-key middleware, and how it differs from the production gateway.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+```bash
+npm install -D @rep-protocol/vite
+```
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { repPlugin } from '@rep-protocol/vite';
+
+export default defineConfig({
+  plugins: [repPlugin()],
+});
+```
+
+## `repPlugin(options?)`
+
+```typescript
+interface RepPluginOptions {
+  env?: string;
+  strict?: boolean;
+}
+
+function repPlugin(options?: RepPluginOptions): Plugin;
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `env` | `string` | `'.env.local'` | Path to the env file, relative to the project root. Classified the same way as the gateway: `REP_PUBLIC_*`, `REP_SENSITIVE_*`, `REP_SERVER_*` prefixes. |
+| `strict` | `boolean` | `false` | Turn guardrail warnings into thrown errors instead of console warnings. |
+
+```ts
+repPlugin({
+  env: '.env.development',
+  strict: true,
+})
+```
+
+## Behavior
+
+- **Dev only.** The plugin only runs during `vite dev` (`configureServer` hook). It does nothing during `vite build` — production HTML ships with no `__rep__` script tag, and the gateway injects it at serve time instead.
+- **Injects `<script id="__rep__">`** into every HTML response via `transformIndexHtml`, using the same JSON shape, HMAC integrity token, and SRI hash format as the Go gateway. `rep.get()`, `rep.getSecure()`, and `rep.verify()` behave identically whether the payload came from the plugin or the gateway.
+- **Watches the env file.** Changes to the file at `env` trigger a full page reload (`server.ws.send({ type: 'full-reload' })`) — no restart needed.
+- **Serves `GET /rep/session-key`** as dev middleware, so `rep.getSecure()` works without a separate gateway process. Unlike the gateway's endpoint, this dev version has no rate limiting or single-use enforcement — it's not meant to run in production.
+- **Runs guardrails** (entropy + known secret-format scanning) on every `REP_PUBLIC_*` value at each rebuild, logging warnings through the Vite server logger.
+- **Ephemeral keys per dev-server start.** A fresh AES key and HMAC secret are generated when the dev server boots and again on every env-file change — matching the gateway's "new keys on every restart" behavior.
+
+<Aside type="caution">
+  The plugin produces byte-identical payload JSON to the gateway (sorted keys, Go-style `&lt;&gt;&amp;` escaping), but it is a development convenience, not a production component. Don't run `vite preview` with an unstripped `.env.local` and call it deployed — the gateway is the only thing that should inject config in production.
+</Aside>
+
+## See also
+
+- [Local Development guide](/guides/development/) — where this fits alongside the CLI dev server and mock-payload approaches
+- [React framework guide](/frameworks/react/) — using the plugin with `useRep()` / `useRepSecure()`
+- [Next.js plugin reference](/reference/plugins/next/) — the equivalent for Next.js

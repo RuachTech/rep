@@ -64,7 +64,7 @@ REP is an open protocol and reference implementation that **decouples environmen
 
 ## Works Everywhere
 
-REP operates at the **infrastructure layer** — no build-tool plugins, no framework coupling. It works with any frontend stack that produces HTML.
+REP operates at the **infrastructure layer** in production — no build-tool plugin required, no framework coupling. It works with any frontend stack that produces HTML. Optional dev-time plugins exist purely for local DX (see below).
 
 <CardGrid>
   <Card title="Containers" icon="rocket">
@@ -74,7 +74,7 @@ REP operates at the **infrastructure layer** — no build-tool plugins, no frame
     Build your app once with `npm run build`. The gateway injects config into the static HTML at serve time — same artifact for every environment.
   </Card>
   <Card title="Local Development" icon="terminal">
-    The CLI wraps the gateway for local dev. Proxy your Vite/webpack dev server with hot reload, or serve a production build with live config changes.
+    Install the [Vite](/reference/plugins/vite/) or [Next.js](/reference/plugins/next/) plugin for zero-config `dev` support, or the CLI wraps the gateway to proxy any dev server with hot reload.
   </Card>
   <Card title="Any Framework" icon="puzzle">
     First-party adapters for React, Vue, and Svelte. A zero-dependency TypeScript SDK works with anything — Angular, vanilla JS, or your custom setup.
@@ -89,7 +89,7 @@ REP operates at the **infrastructure layer** — no build-tool plugins, no frame
 | Fetch `/config.json` at runtime | -- | -- | -- | -- | -- |
 | `window.__ENV__` via shell script | -- | -- | -- | -- | -- |
 | Build-tool plugins (dotenv, etc.) | -- | -- | -- | -- | -- |
-| **REP** | **3-tier** | **AES-256-GCM** | **HMAC + SRI** | **SSE** | **~6MB Go** |
+| **REP** | **3-tier** | **AES-256-GCM** | **HMAC + SRI** | **SSE** | **~7MB Go** |
 
 ## Quick Example
 
@@ -148,7 +148,7 @@ REP_SERVER_DB_PASSWORD=never-reaches-browser
 
 <CardGrid>
   <Card title="Gateway" icon="rocket">
-    Go binary (~6MB). Zero dependencies. `FROM scratch` compatible. Proxy or embedded mode.
+    Go binary (~7MB). Zero dependencies. `FROM scratch` compatible. Proxy or embedded mode.
   </Card>
   <Card title="SDK" icon="document">
     TypeScript. Zero runtime deps. ~1.5KB gzipped. Synchronous `get()`, async `getSecure()`.
@@ -158,6 +158,12 @@ REP_SERVER_DB_PASSWORD=never-reaches-browser
   </Card>
   <Card title="Adapters" icon="puzzle">
     First-party React, Vue, and Svelte adapters with hot-reload-aware hooks and stores.
+  </Card>
+  <Card title="Build-Tool Plugins" icon="setting">
+    Vite (`repPlugin()`) and Next.js (`RepScript`) plugins inject the same payload during `npm run dev` — no gateway needed locally.
+  </Card>
+  <Card title="Codemod" icon="magnifier">
+    `npx @rep-protocol/codemod` automates migration from Vite, CRA, or Next.js `process.env`/`import.meta.env` reads to `rep.get()`.
   </Card>
 </CardGrid>
 

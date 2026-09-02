@@ -194,16 +194,12 @@ export default defineConfig({
         {
           label: 'Examples',
           items: [
-            {
-              label: 'Zero-Config Quick Start',
-              slug: 'examples/quick-no-manifest',
-            },
             { label: 'Todo App (React)', slug: 'examples/todo-react' },
             { label: 'Simple HTML (ESM.sh)', slug: 'examples/simple-html' },
             { label: 'Next.js — Proxy Mode', slug: 'examples/nextjs-proxy' },
             {
               label: 'Next.js CSR + Kubernetes',
-              slug: 'examples/nextjs-csr-kubernetes',
+              slug: 'examples/nextjs-csr-embedded',
             },
           ],
         },
@@ -224,6 +220,13 @@ export default defineConfig({
                 { label: 'React', slug: 'reference/adapters/react' },
                 { label: 'Vue', slug: 'reference/adapters/vue' },
                 { label: 'Svelte', slug: 'reference/adapters/svelte' },
+              ],
+            },
+            {
+              label: 'Build-Tool Plugins',
+              items: [
+                { label: 'Vite', slug: 'reference/plugins/vite' },
+                { label: 'Next.js', slug: 'reference/plugins/next' },
               ],
             },
             { label: 'Codemod', slug: 'reference/codemod' },

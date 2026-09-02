@@ -7,7 +7,7 @@ It reads `REP_*` environment variables at startup, classifies them into PUBLIC /
 ## Features
 
 - **Zero dependencies** — uses only the Go standard library.
-- **~3–5MB binary** — statically compiled, `FROM scratch` compatible.
+- **~7MB binary** — statically compiled, `FROM scratch` compatible.
 - **Two modes** — reverse proxy (in front of nginx/caddy) or embedded file server.
 - **Three-tier security** — PUBLIC (plaintext), SENSITIVE (AES-256-GCM encrypted), SERVER (never sent to client).
 - **Integrity verification** — HMAC-SHA256 signature + SRI hash on every payload.
@@ -50,7 +50,7 @@ make build
 # Build for Linux (Docker/K8s target)
 make build-linux
 
-# Build Docker image (~5MB)
+# Build Docker image (~7MB)
 make docker
 ```
 

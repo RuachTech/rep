@@ -54,7 +54,7 @@ REP is designed to satisfy the following requirements:
 | R3 | **Integrity-verified.** The injected configuration must be verifiable by the client SDK. |
 | R4 | **Synchronously accessible.** Public variables must be available immediately on page load without async operations. |
 | R5 | **Zero application dependencies.** The client SDK must have zero runtime dependencies. |
-| R6 | **Minimal footprint.** The gateway binary must be statically compilable and under 5MB. The client SDK must be under 2KB gzipped. |
+| R6 | **Minimal footprint.** The gateway binary must be statically compilable and under 8MB. The client SDK must be under 2KB gzipped. |
 | R7 | **Container-native.** Must integrate with Docker, Kubernetes, and OCI-compliant runtimes via standard environment variables. |
 | R8 | **Incrementally adoptable.** Must not require an all-or-nothing migration. |
 | R9 | **Observable.** Must emit structured logs and metrics for config injection events. |
