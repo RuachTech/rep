@@ -1,6 +1,6 @@
 {
   "name": "@rep-protocol/next",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Next.js integration for the Runtime Environment Protocol (REP). Injects REP environment variables during development without needing the Go gateway.",
   "author": "Ruach Tech",
   "license": "Apache-2.0",

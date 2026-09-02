@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.16](https://github.com/RuachTech/rep/compare/vite-v0.1.15...vite-v0.1.16) (2026-08-24)
+
+
+### Bug Fixes
+
+* **vite:** bake in version + add plugin README ([#54](https://github.com/RuachTech/rep/issues/54)) ([ef32efd](https://github.com/RuachTech/rep/commit/ef32efd8afa7da3a8ebe1941369ac8a37c180d9d))
+
 ## [0.1.15](https://github.com/RuachTech/rep/compare/vite-v0.1.14...vite-v0.1.15) (2026-03-29)
 
 
