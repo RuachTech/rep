@@ -20,7 +20,7 @@ REP introduces:
 3. **HMAC-SHA256 integrity verification** + SRI hashing on every payload
 4. **Automatic secret detection guardrails** (Shannon entropy, known key format matching)
 5. **Hot config reload** via Server-Sent Events (optional)
-6. A **lightweight Go gateway binary** (~3–5MB, zero dependencies, `FROM scratch` compatible)
+6. A **lightweight Go gateway binary** (~7MB, zero dependencies, `FROM scratch` compatible)
 7. A **zero-dependency TypeScript SDK** (~1.5KB gzipped) with synchronous access for public vars
 
 ---

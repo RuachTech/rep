@@ -55,7 +55,7 @@ For the best dev experience, install the plugin for your build tool. These injec
   });
   ```
 
-  That's it — `rep.get()` and `rep.getSecure()` now work in `vite dev`. No gateway needed.
+  That's it — `rep.get()` and `rep.getSecure()` now work in `vite dev`. No gateway needed. See the [Vite plugin reference](/reference/plugins/vite/) for all options.
   </TabItem>
   <TabItem label="Next.js">
   ```bash
@@ -82,7 +82,7 @@ For the best dev experience, install the plugin for your build tool. These injec
   export { GET } from '@rep-protocol/next/session-key';
   ```
 
-  `RepScript` renders the REP payload during `next dev` and returns `null` in production — the gateway handles injection in prod.
+  `RepScript` renders the REP payload during `next dev` and returns `null` in production — the gateway handles injection in prod. See the [Next.js plugin reference](/reference/plugins/next/) for all options.
   </TabItem>
 </Tabs>
 
@@ -107,7 +107,7 @@ npx @rep-protocol/cli dev --proxy http://localhost:5173
 
 ## Gateway binary
 
-The gateway is a standalone Go binary (~6MB). There are several ways to get it:
+The gateway is a standalone Go binary (~7MB). There are several ways to get it:
 
 ### Via the CLI (recommended)
 

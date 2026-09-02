@@ -1,0 +1,78 @@
+---
+title: Next.js Plugin Reference — @rep-protocol/next
+description: API reference for the REP Next.js plugin. RepScript props, the session-key route handler, and how the plugin behaves in dev vs. production builds.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+```bash
+npm install -D @rep-protocol/next
+```
+
+```tsx
+// app/layout.tsx
+import type { ReactNode } from 'react';
+import { RepScript } from '@rep-protocol/next';
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html>
+      <head><RepScript /></head>
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+## `<RepScript />`
+
+```typescript
+interface RepScriptProps {
+  env?: string;
+  strict?: boolean;
+}
+
+function RepScript(props?: RepScriptProps): React.ReactElement | null;
+```
+
+A React Server Component. Renders `<script id="__rep__">` during `next dev`; renders `null` in production.
+
+| Prop | Type | Default | Description |
+|---|---|---|---|
+| `env` | `string` | `'.env.local'` | Path to the env file, resolved relative to `process.cwd()`. Same `REP_PUBLIC_*` / `REP_SENSITIVE_*` / `REP_SERVER_*` classification as the gateway. |
+| `strict` | `boolean` | `false` | Turn guardrail warnings into thrown errors instead of `console.warn`. |
+
+```tsx
+<RepScript env=".env.development" strict />
+```
+
+## `GET` — session-key route handler
+
+```ts
+// app/api/rep/session-key/route.ts
+export { GET } from '@rep-protocol/next/session-key';
+```
+
+Only needed if you read `REP_SENSITIVE_*` variables with `rep.getSecure()` / `useRepSecure()` during development. Returns the ephemeral AES key as JSON, matching the gateway's `/rep/session-key` response shape.
+
+<Aside type="caution">
+  **Returns 404 in production** (`NODE_ENV === 'production'`). This dev handler has no rate limiting, no single-use token enforcement, and no CORS origin checking — the gateway's `/rep/session-key` endpoint is the only one hardened for production use. Don't route around the 404 by hand-rolling your own version of this handler.
+</Aside>
+
+## Behavior
+
+- **Renders nothing in production.** `NODE_ENV === 'production'` (which `next build` sets automatically) makes `RepScript` return `null`. This also prevents build-time env vars from being baked into the static output — the whole point of REP is that config is resolved after the build, not during it.
+- **Server Component only.** `RepScript` reads the filesystem (`env`) and generates keys server-side; it cannot be used in a Client Component. Consume the injected payload from Client Components via `rep.get()` / `useRep()` as usual — the SDK reads the DOM, not React context.
+- **Script content is Go-escaped** (`<`, `>`, `&` → `<`, `>`, `&`) before being written via `dangerouslySetInnerHTML`, preventing `</script>` breakout from untrusted env values. The tag still carries `type="application/json"`, so the browser never executes it.
+- **Ephemeral keys are process-scoped**, held in a module-level singleton (`getOrCreateKeys()`) so the same key survives across route handler invocations within one `next dev` process.
+- **Byte-identical payload** to the Go gateway and the Vite plugin (sorted keys, same HMAC + SRI format) — `rep.verify()` and `rep.meta()` behave the same regardless of which one produced the payload.
+
+## App Router only
+
+`RepScript` is a Server Component and requires the App Router (`app/`). The Pages Router (`pages/`) doesn't support React Server Components — use the [CLI dev server](/guides/development/#option-d-cli-dev-server-full-fidelity) or [mock payload](/guides/development/#option-c-mock-payload-in-html) approach instead.
+
+## See also
+
+- [Local Development guide](/guides/development/) — where this fits alongside the CLI dev server and mock-payload approaches
+- [Next.js — Proxy Mode example](/examples/nextjs-proxy/) — production deployment behind the gateway
+- [Vite plugin reference](/reference/plugins/vite/) — the equivalent for Vite
