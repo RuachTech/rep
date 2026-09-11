@@ -30,8 +30,10 @@ jobs:
     name: Vet · Test · Build
     needs: changes
     if: |
-      github.event_name == 'push' ||
-      needs.changes.outputs.should_run == 'true'
+      !cancelled() && (
+        github.event_name == 'push' ||
+        needs.changes.outputs.should_run == 'true'
+      )
     runs-on: ubuntu-latest
     defaults:
       run:

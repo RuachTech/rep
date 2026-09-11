@@ -43,9 +43,11 @@ jobs:
     name: Build and Deploy Docs
     needs: changes
     if: |
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
-      needs.changes.outputs.should_run == 'true'
+      !cancelled() && (
+        github.event_name == 'push' ||
+        github.event_name == 'workflow_dispatch' ||
+        needs.changes.outputs.should_run == 'true'
+      )
     runs-on: ubuntu-latest
 
     steps:

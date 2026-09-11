@@ -129,15 +129,27 @@ COPY --from=ghcr.io/ruachtech/rep/gateway:latest /usr/local/bin/rep-gateway /usr
 
 Download from [GitHub Releases](https://github.com/ruachtech/rep/releases) for your platform:
 
+Archives are published on the version tag — `v0.1.7`, not `gateway/v0.1.7`:
+
 ```bash
 # Linux amd64
-curl -fsSL https://github.com/RuachTech/rep/releases/download/gateway/v0.1.2/rep-gateway_0.1.2_linux_amd64.tar.gz | tar -xz
+curl -fsSL https://github.com/RuachTech/rep/releases/download/v0.1.7/rep-gateway_0.1.7_linux_amd64.tar.gz | tar -xz
 mv rep-gateway /usr/local/bin/
 
 # macOS arm64
-curl -fsSL https://github.com/RuachTech/rep/releases/download/gateway/v0.1.2/rep-gateway_0.1.2_darwin_arm64.tar.gz | tar -xz
+curl -fsSL https://github.com/RuachTech/rep/releases/download/v0.1.7/rep-gateway_0.1.7_darwin_arm64.tar.gz | tar -xz
 mv rep-gateway /usr/local/bin/
 ```
+
+To always fetch the newest release instead of a pinned version:
+
+```bash
+VERSION=$(curl -fsSL https://api.github.com/repos/RuachTech/rep/releases/latest | grep -m1 '"tag_name"' | cut -d'"' -f4)
+curl -fsSL "https://github.com/RuachTech/rep/releases/download/${VERSION}/rep-gateway_${VERSION#v}_linux_amd64.tar.gz" | tar -xz
+mv rep-gateway /usr/local/bin/
+```
+
+Each release also ships a `checksums.txt` for verification.
 
 ### Build from source
 
