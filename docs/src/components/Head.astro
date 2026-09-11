@@ -1,0 +1,20 @@
+---
+/**
+ * Starlight `Head` override.
+ *
+ * Advertises the plain-text Markdown mirror of the current page so crawlers and
+ * AI agents can find it from the HTML without guessing the URL convention.
+ */
+import Default from '@astrojs/starlight/components/Head.astro';
+
+const path = Astro.url.pathname.replace(/\/+$/, '');
+const markdownHref = path === '' ? '/index.md' : `${path}.md`;
+const hasMirror = !path.startsWith('/404');
+---
+
+<Default><slot /></Default>
+{
+  hasMirror && (
+    <link rel="alternate" type="text/markdown" href={markdownHref} title="Markdown source" />
+  )
+}

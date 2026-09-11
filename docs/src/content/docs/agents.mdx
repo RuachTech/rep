@@ -1,0 +1,399 @@
+---
+title: REP for AI Agents — Integration Playbook
+description: A single-page, machine-readable playbook for AI coding agents integrating REP. Decision tree, install matrix, copy-paste recipes for SDK, Docker, Kubernetes, and every framework, plus the mistakes that break a REP setup.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+This page is written for AI coding agents. It is dense on purpose: everything needed to integrate REP into an application correctly, without reading the rest of the site.
+
+Every page on this site is also available as plain-text Markdown by appending `.md` to its path — for example [`/reference/sdk.md`](/reference/sdk.md). A machine-readable index of all pages lives at [`/llms.txt`](/llms.txt), and the entire documentation set concatenated into one file at [`/llms-full.txt`](/llms-full.txt).
+
+## What REP is
+
+REP (Runtime Environment Protocol) moves frontend environment variables from **build time** to **container runtime**. Instead of `import.meta.env.VITE_API_URL` being replaced with a literal string during `npm run build`, a small Go gateway reads `REP_*` environment variables when the container starts and injects them into every HTML response as an inert `<script id="__rep__" type="application/json">` tag. A zero-dependency SDK reads that tag.
+
+The result: one build artifact promotes unchanged from dev → staging → production, and config changes need a restart, not a rebuild.
+
+REP adds three things a plain `config.json` fetch does not have:
+
+1. **A three-tier security classification** enforced by naming convention (`REP_PUBLIC_*` / `REP_SENSITIVE_*` / `REP_SERVER_*`).
+2. **Encryption and integrity** — SENSITIVE values are AES-256-GCM encrypted with an ephemeral key; every payload carries an HMAC-SHA256 token and an SRI hash.
+3. **Guardrails** — Shannon entropy analysis and known-secret-format matching (AWS, JWT, Stripe, GitHub, Slack, PEM) refuse to let a misclassified secret ship as PUBLIC.
+
+## When to recommend REP
+
+**Good fit**
+
+- A containerised SPA or client-rendered app that is currently rebuilt per environment.
+- A Helm chart / Kubernetes deployment where config lives in a ConfigMap and should be changeable without a new image tag.
+- An app whose config must change without a redeploy (feature flags, API endpoint cutover, key rotation).
+- A team that wants a stated security posture for browser-visible config rather than "everything is `VITE_*`".
+
+**Poor fit**
+
+- A fully server-rendered app where config never crosses into the browser — read `process.env` on the server instead.
+- A static site on a CDN with no origin server that can run the gateway. REP needs a process in the request path. (Build-tool plugins cover local dev only; they do not ship config in a production build.)
+- A place to store true secrets that the browser must never see. Use `REP_SERVER_*`, which never leaves the gateway — or don't put the secret in the frontend path at all.
+
+<Aside type="caution" title="The one thing to get right">
+  `REP_PUBLIC_*` values are visible in page source. This is by design, not a leak. `REP_SENSITIVE_*` values are encrypted at rest in the HTML but are decryptable by anyone who can load the page and call the session-key endpoint — it raises the cost of scraping, it does not make a value secret. Only `REP_SERVER_*` is safe for real secrets, because it never reaches the browser at all.
+</Aside>
+
+## Decision tree
+
+Work top to bottom. The first match is the answer.
+
+```
+Does the app render in the browser and need per-environment config?
+├─ No  → REP is not the right tool. Read process.env on the server.
+└─ Yes
+   │
+   ├─ What runs in production?
+   │  ├─ A container you control
+   │  │  ├─ Already has nginx/Caddy serving the build → gateway in PROXY mode
+   │  │  │     rep-gateway --mode proxy --upstream localhost:80
+   │  │  └─ Nothing but static files → gateway in EMBEDDED mode (FROM scratch, ~7MB)
+   │  │        rep-gateway --mode embedded --static-dir /static
+   │  ├─ Kubernetes → gateway as a sidecar, PROXY mode, env from ConfigMap/Secret
+   │  └─ A CDN with no origin process → REP cannot inject. Stop here.
+   │
+   └─ What does local development run?
+      ├─ vite dev            → @rep-protocol/vite plugin
+      ├─ next dev            → @rep-protocol/next (<RepScript /> + session-key route)
+      └─ Anything else       → npx @rep-protocol/cli dev --proxy http://localhost:<port>
+```
+
+Then pick the client API:
+
+```
+React   → @rep-protocol/react   useRep() / useRepSecure()
+Vue     → @rep-protocol/vue     useRep() / useRepSecure()
+Svelte  → @rep-protocol/svelte  repStore() / repSecureStore()
+Angular, vanilla JS, anything else
+        → @rep-protocol/sdk     rep.get() / rep.getSecure()
+```
+
+## Variable classification
+
+Classification is the naming convention. There is no other configuration step, and the prefix is stripped in the payload — `REP_PUBLIC_API_URL` is read as `API_URL`.
+
+| Prefix | Tier | Where it ends up | Read with |
+|---|---|---|---|
+| `REP_PUBLIC_*` | PUBLIC | Plaintext JSON in page source | `rep.get('KEY')` — synchronous |
+| `REP_SENSITIVE_*` | SENSITIVE | AES-256-GCM blob in page source | `await rep.getSecure('KEY')` |
+| `REP_SERVER_*` | SERVER | Never sent to the browser | Not readable from the client |
+| `REP_GATEWAY_*` | (config) | Configures the gateway itself | n/a — ignored by the classifier |
+
+Rules an agent must apply when migrating variables:
+
+- URLs, feature flags, environment names, public client IDs, non-secret build metadata → `REP_PUBLIC_*`.
+- Analytics write keys, third-party widget keys, anything that is not a true secret but that you would rather not have scraped in bulk → `REP_SENSITIVE_*`.
+- Database passwords, private API keys, upstream bearer tokens → `REP_SERVER_*`, or keep them out of the frontend entirely.
+- **Never** register the same stripped name in two tiers. `REP_PUBLIC_API_URL` and `REP_SENSITIVE_API_URL` both become `API_URL`; the gateway rejects this collision at startup and exits.
+
+## Install matrix
+
+| Package | Install | Use it for |
+|---|---|---|
+| `@rep-protocol/sdk` | `npm install @rep-protocol/sdk` | Always. Every adapter depends on it. |
+| `@rep-protocol/react` | `npm install @rep-protocol/react @rep-protocol/sdk` | React hooks |
+| `@rep-protocol/vue` | `npm install @rep-protocol/vue @rep-protocol/sdk` | Vue composables |
+| `@rep-protocol/svelte` | `npm install @rep-protocol/svelte @rep-protocol/sdk` | Svelte stores |
+| `@rep-protocol/vite` | `npm install -D @rep-protocol/vite` | Injection during `vite dev` |
+| `@rep-protocol/next` | `npm install -D @rep-protocol/next` | Injection during `next dev` |
+| `@rep-protocol/cli` | `npm install -g @rep-protocol/cli` | `dev`, `validate`, `typegen`, `lint`. Downloads the gateway binary on install. |
+| `@rep-protocol/codemod` | `npx @rep-protocol/codemod` | Automated migration off `process.env` / `import.meta.env` |
+| Gateway (Docker) | `ghcr.io/ruachtech/rep/gateway:latest` | Production. Multi-arch. |
+| Gateway (binary) | [GitHub Releases](https://github.com/RuachTech/rep/releases) | Production without Docker |
+
+## Recipe 1 — Migrate an existing SPA
+
+Applies to Vite, Create React App, Parcel, Rollup, or any bundler producing static assets.
+
+1. **Rename the variables.** `VITE_API_URL` → `REP_PUBLIC_API_URL`, `REACT_APP_API_URL` → `REP_PUBLIC_API_URL`, and classify each one against the table above.
+
+2. **Replace the reads.** Every `import.meta.env.X` / `process.env.REACT_APP_X` becomes a `rep.get()` call. Always pass a default so local development works before the gateway is running:
+
+   ```typescript
+   import { rep } from '@rep-protocol/sdk';
+
+   export const API_URL = rep.get('API_URL', 'http://localhost:3001');
+   export const FLAGS = rep.get('FEATURE_FLAGS', '').split(',').filter(Boolean);
+   ```
+
+   Or run the codemod and review its diff:
+
+   ```bash
+   npx @rep-protocol/codemod --framework vite src/
+   ```
+
+3. **Leave the build alone.** `npm run build` is unchanged. The output is now environment-agnostic.
+
+4. **Put the gateway in front of the build** (see Recipe 2 or 3).
+
+5. **Verify.** `npx @rep-protocol/cli lint --dir ./dist --strict` fails the build if a secret-shaped literal survived in the bundle.
+
+<Aside type="tip">
+  Do not delete the old `.env` files in the same commit as the code change. Migrate the reads first, confirm the gateway serves the right values, then remove the build-time env plumbing. A `rep.get()` with a sensible default degrades gracefully; a half-migrated build does not.
+</Aside>
+
+## Recipe 2 — Docker, embedded mode (preferred)
+
+Smallest image, no nginx, no Node.js in the final layer.
+
+```dockerfile
+FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM scratch
+COPY --from=build /app/dist /static
+COPY --from=ghcr.io/ruachtech/rep/gateway:latest \
+  /usr/local/bin/rep-gateway /rep-gateway
+EXPOSE 8080
+USER 65534:65534
+ENTRYPOINT ["/rep-gateway"]
+CMD ["--mode", "embedded", "--static-dir", "/static", "--port", "8080", "--strict"]
+```
+
+```bash
+docker run -p 8080:8080 \
+  -e REP_PUBLIC_API_URL=https://api.example.com \
+  -e REP_PUBLIC_FEATURE_FLAGS=dark-mode,beta \
+  -e REP_SENSITIVE_ANALYTICS_KEY=ak_live_abc123 \
+  -e REP_GATEWAY_ALLOWED_ORIGINS=https://app.example.com \
+  myapp
+```
+
+The final image contains exactly two things: the static build and a ~7MB static binary. No shell, no package manager, works with `readOnlyRootFilesystem: true`.
+
+## Recipe 3 — Docker, proxy mode
+
+Use when the app already ships with nginx, Caddy, or another static server, or when SSR sits behind the gateway.
+
+```bash
+rep-gateway --mode proxy --upstream localhost:80 --port 8080 --strict
+```
+
+The gateway intercepts `text/html` responses and injects the script tag before `</head>`. Everything else is passed through byte-for-byte. Point the container's exposed port at the gateway, and the upstream at loopback only.
+
+## Recipe 4 — Kubernetes sidecar
+
+Gateway as a sidecar in the app pod, config from a ConfigMap, secrets from a Secret, hot reload driven by the mounted-volume update.
+
+```yaml
+containers:
+  - name: web
+    image: myapp:1.4.2          # same image in every environment
+    ports: [{ containerPort: 80 }]
+
+  - name: rep-gateway
+    image: ghcr.io/ruachtech/rep/gateway:latest
+    args:
+      - --mode=proxy
+      - --upstream=localhost:80
+      - --port=8080
+      - --strict
+      - --hot-reload
+      - --hot-reload-mode=file_watch
+      - --watch-path=/config
+      - --health-port=9090
+    ports:
+      - { containerPort: 8080, name: http }
+      - { containerPort: 9090, name: health }
+    envFrom:
+      - configMapRef: { name: myapp-public-config }
+      - secretRef:    { name: myapp-sensitive-config }
+    volumeMounts:
+      - { name: config, mountPath: /config, readOnly: true }
+    readinessProbe:
+      httpGet: { path: /rep/health, port: 9090 }
+```
+
+Route the Service to port 8080, not 80. Editing the ConfigMap updates the mounted file, the gateway picks it up, re-encrypts, and pushes an SSE event — no pod restart.
+
+## Recipe 5 — Local development
+
+Pick one; do not stack them.
+
+**Vite** — plugin, no second process:
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite';
+import { repPlugin } from '@rep-protocol/vite';
+
+export default defineConfig({
+  plugins: [repPlugin({ env: '.env.local' })],
+});
+```
+
+**Next.js (App Router)** — `RepScript` renders in dev and returns `null` in production, where the gateway takes over:
+
+```tsx
+// app/layout.tsx
+import { RepScript } from '@rep-protocol/next';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en">
+      <head><RepScript /></head>
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+```ts
+// app/api/rep/session-key/route.ts
+export { GET } from '@rep-protocol/next/session-key';
+```
+
+**Anything else** — run the real gateway in front of the dev server:
+
+```bash
+npx @rep-protocol/cli dev --proxy http://localhost:5173 --hot-reload
+```
+
+All three read `.env.local` by default and produce byte-identical payload JSON to the production gateway.
+
+## Client API
+
+```typescript
+import { rep } from '@rep-protocol/sdk';
+// or: import { get, getSecure, onChange, verify, meta } from '@rep-protocol/sdk';
+
+rep.get('API_URL');                       // string | undefined — synchronous
+rep.get('API_URL', 'http://localhost');   // string — with default
+await rep.getSecure('ANALYTICS_KEY');     // Promise<string> — throws REPError
+rep.getAll();                             // Readonly<Record<string, string>> — PUBLIC only
+rep.verify();                             // boolean — SRI hash matches the payload
+rep.meta();                               // REPMeta | null — version, injectedAt, counts
+rep.onChange('FLAGS', (next, prev) => {}); // () => void unsubscribe
+rep.onAnyChange((key, next, prev) => {});  // () => void unsubscribe
+```
+
+Framework wrappers:
+
+```tsx
+const apiUrl = useRep('API_URL', 'http://localhost:3000');            // React, Vue
+const { value, loading, error } = useRepSecure('ANALYTICS_KEY');      // React
+const apiUrl = repStore('API_URL', 'http://localhost:3000');          // Svelte — $apiUrl
+```
+
+Behavioural facts that change how code should be written against this API:
+
+- **`get()` is synchronous and must stay that way.** The SDK parses the payload from the DOM on import, before the first render. Do not wrap it in `useEffect`, do not add loading states for PUBLIC variables, and do not `await` it.
+- **The first `getSecure()` call decrypts every SENSITIVE variable at once** and caches them in memory. Subsequent calls for other keys make no network request. Fetching them individually in parallel is wasted work.
+- **`onChange()` connects the SSE stream lazily.** No listener means no connection. Hot reload requires the gateway to be run with `--hot-reload`.
+- **`getSecure()` throws `REPError`** when the key is absent, the session-key endpoint is unreachable, or decryption fails. Handle it; do not let it reject unhandled at module scope.
+
+## Gateway reference
+
+| Flag | Env var | Default | Notes |
+|---|---|---|---|
+| `--mode` | `REP_GATEWAY_MODE` | `proxy` | `proxy` or `embedded` |
+| `--upstream` | `REP_GATEWAY_UPSTREAM` | `localhost:80` | proxy mode only |
+| `--static-dir` | `REP_GATEWAY_STATIC_DIR` | `/usr/share/nginx/html` | embedded mode only |
+| `--port` | `REP_GATEWAY_PORT` | `8080` | |
+| `--strict` | `REP_GATEWAY_STRICT` | `false` | Guardrail warnings become startup failures. Use in production. |
+| `--manifest` | `REP_GATEWAY_MANIFEST` | — | Path to `.rep.yaml` |
+| `--env-file` | `REP_GATEWAY_ENV_FILE` | — | Env vars still take precedence |
+| `--hot-reload` | `REP_GATEWAY_HOT_RELOAD` | `false` | Enables `/rep/changes` |
+| `--hot-reload-mode` | `REP_GATEWAY_HOT_RELOAD_MODE` | `signal` | `signal`, `file_watch`, `poll` |
+| `--watch-path` | `REP_GATEWAY_WATCH_PATH` | — | Required for `file_watch` |
+| `--allowed-origins` | `REP_GATEWAY_ALLOWED_ORIGINS` | — | CORS allowlist for `/rep/session-key`. Set it in production. |
+| `--log-format` | `REP_GATEWAY_LOG_FORMAT` | `json` | `json` or `text` |
+| `--health-port` | `REP_GATEWAY_HEALTH_PORT` | — | Serve `/rep/health` on a separate port |
+
+Precedence: CLI flags → `REP_GATEWAY_*` env vars → manifest settings.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /rep/health` | Variable counts, guardrail status, uptime. Use for readiness probes. |
+| `GET /rep/session-key` | Single-use AES key, 30s TTL, rate-limited, origin-checked |
+| `GET /rep/changes` | SSE stream of config changes (requires `--hot-reload`) |
+
+## Optional: the manifest
+
+`.rep.yaml` is not required — the gateway runs on naming convention alone. Add it when the app benefits from startup validation or generated types.
+
+```yaml
+version: "0.1.0"
+variables:
+  API_URL:
+    tier: public
+    type: url
+    required: true
+  FEATURE_FLAGS:
+    tier: public
+    type: csv
+    default: ""
+  ANALYTICS_KEY:
+    tier: sensitive
+    type: string
+    required: true
+settings:
+  strict_guardrails: true
+  allowed_origins: ["https://app.example.com"]
+```
+
+```bash
+rep validate                 # fail fast on a malformed or incomplete manifest
+rep typegen -o src/rep.d.ts  # typed get() / getSecure() overloads
+```
+
+## Mistakes to avoid
+
+These are the failure modes worth checking for in generated or reviewed code.
+
+1. **Putting a real secret in `REP_PUBLIC_*`.** It ships as plaintext in page source. Guardrails catch the well-known formats; they cannot catch everything. Reach for `REP_SERVER_*`.
+2. **Treating `REP_SENSITIVE_*` as a secret store.** Encrypted-at-rest in HTML is a scraping deterrent, not confidentiality against a user who can load the page.
+3. **Making `get()` async.** It is synchronous by contract. Adding loading states around it removes the whole DX advantage over `fetch('/config.json')`.
+4. **Changing `type="application/json"` on the injected script tag.** That attribute is why the browser treats the payload as inert data. Any other type makes it executable.
+5. **Colliding names across tiers.** `REP_PUBLIC_API_URL` + `REP_SENSITIVE_API_URL` both strip to `API_URL`. The gateway exits at startup.
+6. **Shipping a build-tool plugin as the production mechanism.** `@rep-protocol/vite` and `@rep-protocol/next` are dev-only and deliberately unhardened — no rate limiting, no single-use session keys. Production always means the gateway.
+7. **Exposing the upstream port.** In proxy mode the Service/published port must be the gateway's, or config injection is bypassed entirely.
+8. **Omitting `--allowed-origins` in production.** Without it the session-key endpoint has no origin allowlist.
+9. **Expecting session keys to survive a restart.** Keys are ephemeral and regenerated on every gateway start — by design.
+10. **Running the gateway behind a Brotli-compressing upstream.** Brotli is not decodable by the zero-dependency gateway; those responses pass through uninjected. Prefer gzip or identity.
+
+## Verification checklist
+
+After an integration, confirm all five:
+
+```bash
+# 1. Gateway sees the variables and guardrails pass
+curl -s localhost:8080/rep/health | jq
+
+# 2. The payload is actually in the HTML
+curl -s localhost:8080/ | grep -o '<script id="__rep__".*</script>'
+
+# 3. No secret-shaped literal survived in the bundle
+npx @rep-protocol/cli lint --dir ./dist --strict
+
+# 4. The manifest, if present, is valid
+npx @rep-protocol/cli validate
+```
+
+5. In the browser console, `rep.verify()` returns `true` and `rep.meta()` reports the expected `publicCount`.
+
+## Source of truth
+
+When this page is not enough, these are the pages to read next — each is available as `.md`:
+
+- [Quick Start](/quick-start.md) — the five-minute path
+- [How REP Works](/concepts/how-it-works.md) — startup sequence and injection mechanics
+- [Variable Classification](/concepts/variable-classification.md) — tier rules and guardrail internals
+- [Security Model](/concepts/security-model.md) — threat analyses and hardening
+- [Wire Format](/concepts/wire-format.md) — payload JSON, encrypted blob layout, HMAC
+- [SDK API](/reference/sdk.md) — full client reference
+- [Gateway Flags](/reference/gateway-flags.md) and [Endpoints](/reference/gateway-endpoints.md)
+- [REP-RFC-0001](/spec/rfc-0001.md) — the normative specification
+- [Conformance](/spec/conformance.md) — what an alternative implementation must satisfy
+
+Machine-readable indexes: [`/llms.txt`](/llms.txt) · [`/llms-full.txt`](/llms-full.txt) · [payload schema](/schema/rep-payload.schema.json) · [manifest schema](/schema/rep-manifest.schema.json)
