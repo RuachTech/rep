@@ -95,14 +95,10 @@ spec:
             - "--upstream=localhost:80"
             - "--port=8080"
             - "--strict"
+            - "--env-file=/config/.env"
             - "--hot-reload"
             - "--hot-reload-mode=file_watch"
             - "--watch-path=/config"
-          envFrom:
-            - configMapRef:
-                name: frontend-public-config
-            - secretRef:
-                name: frontend-sensitive-config
           volumeMounts:
             - name: config-volume
               mountPath: /config
@@ -130,16 +126,37 @@ spec:
             name: frontend-dynamic-config
 ```
 
+The mounted ConfigMap must hold a single key containing a whole `.env` file, because `--env-file` reads one env-format file:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-dynamic-config
+data:
+  .env: |
+    REP_PUBLIC_API_URL=https://api.example.com
+    REP_PUBLIC_FEATURE_FLAGS=dark-mode
+    REP_PUBLIC_ENV_NAME=production
+```
+
 ## Hot reload with ConfigMaps
 
 Use file watch mode to detect ConfigMap changes without pod restarts:
 
-1. Mount the ConfigMap as a volume
-2. Enable `--hot-reload --hot-reload-mode=file_watch --watch-path=/config`
-3. Update the ConfigMap: `kubectl apply -f configmap.yaml`
-4. Kubernetes refreshes the mounted volume
-5. The gateway detects the change and broadcasts via SSE
-6. Connected browsers receive the update
+1. Mount the ConfigMap as a volume, with a single key holding a whole `.env` file
+2. Point the gateway at it with `--env-file=/config/.env` — this is what reload re-reads
+3. Enable `--hot-reload --hot-reload-mode=file_watch --watch-path=/config`
+4. Update the ConfigMap: `kubectl apply -f configmap.yaml`
+5. Kubernetes swaps the volume's `..data` symlink, changing the mount directory's mtime
+6. The gateway detects the change, re-reads the env file, and broadcasts via SSE
+7. Connected browsers receive the update
+
+<Aside type="caution" title="Do not also set these variables via envFrom">
+  Reload merges the env file first, then lets the process environment overwrite it. A variable supplied through both `envFrom` and `--env-file` keeps its `envFrom` value permanently — `envFrom` is captured once at container start, so the reload succeeds but the injected value never changes. Use `envFrom` only for variables you are content to change with a pod restart, and never for a key that also appears in the env file.
+</Aside>
+
+Variables passed through `envFrom` alone are **not** hot-reloadable. Changing `frontend-public-config` or `frontend-sensitive-config` above requires a pod restart (`kubectl rollout restart`). To rotate a `REP_SENSITIVE_*` value without one, move it into the mounted env file — sourced from a Secret instead of a ConfigMap — since `--env-file` accepts a single path.
 
 ```bash
 # Update a config value

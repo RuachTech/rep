@@ -4,7 +4,7 @@
 
 REP is an open protocol for injecting environment variables into browser apps **at container runtime** — not build time. It gives you security classification, encryption, integrity verification, and hot reload, with zero build-tool coupling.
 
-[Documentation](https://rep-protocol.dev)
+[Documentation](https://rep-protocol.dev) · [AI agent playbook](https://rep-protocol.dev/agents.md) · [llms.txt](https://rep-protocol.dev/llms.txt)
 
 ## Quick Start
 
@@ -303,6 +303,19 @@ REP is a formal, open specification — not just a tool.
 | [`examples/simple-html/`](examples/simple-html/) | Plain HTML + embedded | Single HTML file, SDK via esm.sh, no build step, `FROM scratch` image |
 | [`examples/nextjs-proxy/`](examples/nextjs-proxy/) | Next.js SSR + proxy | Next.js server behind the gateway in proxy mode; Docker Compose two-service setup |
 | [`examples/nextjs-csr-embedded/`](examples/nextjs-csr-embedded/) | Next.js CSR + embedded + Kubernetes | Static export served by gateway; ConfigMap-driven feature flags with hot-reload variant (zero pod restarts) |
+
+---
+
+## For AI agents
+
+The documentation is published in machine-readable form:
+
+| Resource | What it is |
+|---|---|
+| [`/agents.md`](https://rep-protocol.dev/agents.md) | Single-page integration playbook — decision tree, install matrix, copy-paste recipes for every framework and deployment target, and the mistakes that break a REP setup |
+| [`/llms.txt`](https://rep-protocol.dev/llms.txt) | Index of every documentation page with descriptions |
+| [`/llms-full.txt`](https://rep-protocol.dev/llms-full.txt) | The entire documentation set as one plain-text file |
+| `<any page>.md` | Every page has a plain-text Markdown mirror — e.g. [`/reference/sdk.md`](https://rep-protocol.dev/reference/sdk.md) |
 
 ---
 
