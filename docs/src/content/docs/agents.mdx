@@ -183,9 +183,21 @@ The gateway intercepts `text/html` responses and injects the script tag before `
 
 ## Recipe 4 — Kubernetes sidecar
 
-Gateway as a sidecar in the app pod, config from a ConfigMap, secrets from a Secret, hot reload driven by the mounted-volume update.
+Gateway as a sidecar in the app pod, with hot reload driven by a mounted ConfigMap.
+
+The reloadable variables must arrive as a **mounted env-format file** passed to `--env-file`, not through `envFrom`. `envFrom` copies values into the container's process environment once, at container start; a ConfigMap volume refresh never changes them, so a reload re-reads the same stale values.
 
 ```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myapp-config
+data:
+  # One key holding a whole .env file — not one key per variable.
+  .env: |
+    REP_PUBLIC_API_URL=https://api.example.com
+    REP_PUBLIC_FEATURE_FLAGS=dark-mode,beta
+---
 containers:
   - name: web
     image: myapp:1.4.2          # same image in every environment
@@ -198,23 +210,35 @@ containers:
       - --upstream=localhost:80
       - --port=8080
       - --strict
+      - --env-file=/config/.env   # required: the reload source
       - --hot-reload
       - --hot-reload-mode=file_watch
-      - --watch-path=/config
+      - --watch-path=/config      # the mount dir, not the file
       - --health-port=9090
     ports:
       - { containerPort: 8080, name: http }
       - { containerPort: 9090, name: health }
     envFrom:
-      - configMapRef: { name: myapp-public-config }
-      - secretRef:    { name: myapp-sensitive-config }
+      # Gateway tuning only. Must not carry REP_PUBLIC_*/REP_SENSITIVE_* keys
+      # that also appear in the env file — see the precedence note below.
+      - secretRef: { name: myapp-gateway-env }
     volumeMounts:
       - { name: config, mountPath: /config, readOnly: true }
     readinessProbe:
       httpGet: { path: /rep/health, port: 9090 }
+
+volumes:
+  - name: config
+    configMap: { name: myapp-config }
 ```
 
-Route the Service to port 8080, not 80. Editing the ConfigMap updates the mounted file, the gateway picks it up, re-encrypts, and pushes an SSE event — no pod restart.
+Route the Service to port 8080, not 80. `kubectl apply` on the ConfigMap refreshes the mounted file (kubelet swaps the volume's `..data` symlink atomically, which changes the directory's mtime); the watcher fires, the gateway re-reads `/config/.env`, re-encrypts the sensitive blob, and pushes an SSE event — no pod restart.
+
+<Aside type="caution" title="Process environment wins over the env file">
+  `ReadAndClassify` merges the env file first and then lets `os.Environ()` overwrite it. A key supplied through both `envFrom` and `--env-file` therefore keeps its `envFrom` value forever: reload runs, logs success, and the injected value never changes. Pick one source per variable.
+</Aside>
+
+To rotate `REP_SENSITIVE_*` values without a restart too, put them in the same mounted env file — sourced from a Secret rather than a ConfigMap — and point `--env-file` at that. `--env-file` takes a single path, so all reloadable variables must live in one file.
 
 ## Recipe 5 — Local development
 
