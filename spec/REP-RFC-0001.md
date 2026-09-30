@@ -150,6 +150,8 @@ On process start, the gateway MUST perform the following steps in order:
 5.  IF --manifest specified → LOAD the .rep.yaml manifest and validate
     all declared variables against the environment (required vars present,
     types match, patterns match). On validation failure → EXIT with error.
+    Then INJECT the `default` of every declared variable that is not
+    required and is unset in every tier (see §6.3).
 6.  RUN secret detection guardrails on PUBLIC tier variables
 7.  IF --strict AND guardrails triggered → EXIT with error
 8.  GENERATE ephemeral master key, derive AES-256 encryption key via
@@ -163,7 +165,8 @@ On process start, the gateway MUST perform the following steps in order:
     - Health check endpoint (/rep/health)
     - Hot reload SSE endpoint (/rep/changes) [if enabled]
 13. START accepting connections
-14. LOG startup summary: variable counts per tier, any guardrail warnings
+14. LOG startup summary: variable counts per tier (injected defaults
+    included), any guardrail warnings
 ```
 
 ### 4.3 HTML Injection
@@ -488,6 +491,18 @@ settings:
 | `csv` | Comma-separated string (no validation of individual items) |
 | `json` | Must be valid JSON |
 | `enum` | Must match one of the values in the `values` array |
+
+### 6.3 Defaults
+
+A variable that declares `default` and is not `required` has a value whether or not the environment sets one. When no variable of that name is set in any tier, the gateway MUST inject the default as though `REP_<TIER>_<NAME>` had been set to it, where `<TIER>` is the declared `tier`:
+
+- A PUBLIC default appears in the payload and is readable with `rep.get()`; a SENSITIVE default is encrypted like any other SENSITIVE value; a SERVER default stays in the gateway.
+- A default MUST pass the same type and pattern validation as a set value. A default that fails is a manifest error and the gateway MUST refuse to start.
+- A PUBLIC default is scanned by the guardrails (§3.3) like any other PUBLIC value.
+- An empty string is a default: `default: ""` injects `""`.
+- A value in the environment always wins, including an empty one.
+- `required: true` takes precedence. A required variable that is unset is a startup error even if it declares a default.
+- Defaults are re-applied on every hot reload, so removing a variable from the environment reverts it to its default rather than deleting it.
 
 ---
 

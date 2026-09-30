@@ -43,8 +43,9 @@ type VarDecl struct {
 	Required bool
 
 	// Default holds the fallback value when Required is false and the variable
-	// is absent. HasDefault distinguishes an explicit empty default from
-	// "no default declared".
+	// is absent from every tier. The gateway injects it into Tier as if it had
+	// been set (see config.ClassifiedVars.ApplyDefaults). HasDefault
+	// distinguishes an explicit empty default from "no default declared".
 	Default    string
 	HasDefault bool
 
@@ -151,7 +152,8 @@ func (m *Manifest) Validate(public, sensitive, server map[string]string, log fun
 			if decl.Required {
 				errs = append(errs, fmt.Sprintf("required variable %q is not set", name))
 			}
-			// Optional + absent: nothing to validate.
+			// Optional + absent: a declared default is filled in and checked
+			// afterwards by config.ClassifiedVars.ApplyDefaults.
 			continue
 		}
 
@@ -166,27 +168,34 @@ func (m *Manifest) Validate(public, sensitive, server map[string]string, log fun
 			}
 		}
 
-		// Type validation.
-		if err := validateType(name, value, decl); err != nil {
+		if err := decl.Check(name, value); err != nil {
 			errs = append(errs, err.Error())
-			continue
-		}
-
-		// Pattern validation (applies to any type when declared).
-		if decl.Pattern != "" {
-			matched, err := regexp.MatchString(`^(?:`+decl.Pattern+`)$`, value)
-			if err != nil {
-				errs = append(errs, fmt.Sprintf("variable %q has invalid pattern expression %q: %v", name, decl.Pattern, err))
-				continue
-			}
-			if !matched {
-				errs = append(errs, fmt.Sprintf("variable %q value does not match pattern %q", name, decl.Pattern))
-			}
 		}
 	}
 
 	if len(errs) > 0 {
 		return fmt.Errorf("manifest validation failed:\n  - %s", strings.Join(errs, "\n  - "))
+	}
+	return nil
+}
+
+// Check validates value against the declared type and, when one is declared,
+// the pattern. It is the single check applied to every value the gateway
+// serves for a declared variable — whether it came from the environment or
+// from the declaration's default.
+func (d *VarDecl) Check(name, value string) error {
+	if err := validateType(name, value, d); err != nil {
+		return err
+	}
+	if d.Pattern == "" {
+		return nil
+	}
+	matched, err := regexp.MatchString(`^(?:`+d.Pattern+`)$`, value)
+	if err != nil {
+		return fmt.Errorf("variable %q has invalid pattern expression %q: %v", name, d.Pattern, err)
+	}
+	if !matched {
+		return fmt.Errorf("variable %q value does not match pattern %q", name, d.Pattern)
 	}
 	return nil
 }

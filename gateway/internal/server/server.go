@@ -77,6 +77,18 @@ func New(cfg *config.Config, logger *slog.Logger, version string) (*Server, erro
 		}
 	}
 
+	// Step 2c: Fill in manifest defaults for optional variables left unset
+	// (§6.3). After validation, which judges only what the environment set
+	// (a defaulted deprecated variable is not "present"); before guardrails,
+	// so a PUBLIC default is scanned.
+	defaulted, err := vars.ApplyDefaults(cfg.Manifest)
+	if err != nil {
+		return nil, fmt.Errorf("manifest validation: %w", err)
+	}
+	for _, v := range defaulted {
+		logger.Info("rep.manifest.default_applied", "name", v.Name, "tier", v.Tier.String())
+	}
+
 	// Step 3–4: Run secret detection guardrails.
 	logger.Info("running guardrail scan on PUBLIC tier variables")
 	gr := guardrails.Scan(vars, logger)
@@ -197,6 +209,7 @@ func New(cfg *config.Config, logger *slog.Logger, version string) (*Server, erro
 		"public_vars", len(vars.Public),
 		"sensitive_vars", len(vars.Sensitive),
 		"server_vars", len(vars.Server),
+		"defaulted_vars", len(defaulted),
 		"guardrail_warnings", len(gr.Warnings),
 		"hot_reload", cfg.HotReload,
 		"strict", cfg.Strict,
@@ -349,7 +362,7 @@ func (s *Server) runPoller(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			newVars, err := config.ReadAndClassify(s.cfg.EnvFile)
+			newVars, err := s.readVars()
 			if err != nil {
 				s.logger.Error("rep.hotreload.poll.classify_error", "error", err)
 				continue
@@ -395,7 +408,7 @@ func (s *Server) Reload() error {
 	s.logger.Info("reloading configuration")
 
 	// Re-read and classify.
-	vars, err := config.ReadAndClassify(s.cfg.EnvFile)
+	vars, err := s.readVars()
 	if err != nil {
 		return fmt.Errorf("re-classifying variables: %w", err)
 	}
@@ -428,6 +441,20 @@ func (s *Server) Reload() error {
 	)
 
 	return nil
+}
+
+// readVars re-reads and classifies the environment and fills in manifest
+// defaults, so a reload or a poll sees the same variable set startup built.
+// Manifest validation is a startup-only step and is not repeated here.
+func (s *Server) readVars() (*config.ClassifiedVars, error) {
+	vars, err := config.ReadAndClassify(s.cfg.EnvFile)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := vars.ApplyDefaults(s.cfg.Manifest); err != nil {
+		return nil, err
+	}
+	return vars, nil
 }
 
 // broadcastChanges compares old and new variables and emits SSE events.

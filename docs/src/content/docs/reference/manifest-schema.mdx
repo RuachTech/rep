@@ -23,7 +23,7 @@ variables:
     tier: public        # Required: public, sensitive, or server
     type: url           # Required: string, url, number, boolean, csv, json, enum
     required: true      # Optional (default: false)
-    default: ""         # Optional — default value if not provided
+    default: ""         # Optional — injected when unset (ignored if required)
     description: "..."  # Optional — human-readable description
     example: "..."      # Optional — example value
     pattern: "^..."     # Optional — regex pattern the value must match
@@ -39,7 +39,7 @@ variables:
 | `tier` | `public` \| `sensitive` \| `server` | Yes | Security classification tier |
 | `type` | see types table | Yes | Value type constraint |
 | `required` | `boolean` | No | Must be present at startup (default: `false`) |
-| `default` | `string` | No | Default value when variable is absent |
+| `default` | `string` | No | Injected into the declared tier when the variable is unset and not `required`. See [Defaults](/guides/manifest/#defaults) |
 | `description` | `string` | No | Human-readable purpose |
 | `example` | `string` | No | Example value for documentation |
 | `pattern` | `string` | No | Regex the value must match |

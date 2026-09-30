@@ -37,6 +37,15 @@ func (t Tier) String() string {
 	}
 }
 
+// tiers lists every Tier, in classification order.
+var tiers = []Tier{TierPublic, TierSensitive, TierServer}
+
+// Prefix returns the environment variable prefix for the tier, e.g.
+// "REP_PUBLIC_".
+func (t Tier) Prefix() string {
+	return "REP_" + strings.ToUpper(t.String()) + "_"
+}
+
 // Variable represents a classified environment variable.
 type Variable struct {
 	// Name is the variable name with the REP_<TIER>_ prefix stripped.
@@ -136,21 +145,8 @@ func ReadAndClassify(envFile string) (*ClassifiedVars, error) {
 			continue
 		}
 
-		var v Variable
-		v.OriginalKey = key
-		v.Value = value
-
-		switch {
-		case strings.HasPrefix(key, "REP_PUBLIC_"):
-			v.Name = strings.TrimPrefix(key, "REP_PUBLIC_")
-			v.Tier = TierPublic
-		case strings.HasPrefix(key, "REP_SENSITIVE_"):
-			v.Name = strings.TrimPrefix(key, "REP_SENSITIVE_")
-			v.Tier = TierSensitive
-		case strings.HasPrefix(key, "REP_SERVER_"):
-			v.Name = strings.TrimPrefix(key, "REP_SERVER_")
-			v.Tier = TierServer
-		default:
+		v, ok := classify(key, value)
+		if !ok {
 			continue
 		}
 
@@ -162,17 +158,30 @@ func ReadAndClassify(envFile string) (*ClassifiedVars, error) {
 			)
 		}
 		seen[v.Name] = v.OriginalKey
-
-		// Classify into tier bucket.
-		switch v.Tier {
-		case TierPublic:
-			vars.Public = append(vars.Public, v)
-		case TierSensitive:
-			vars.Sensitive = append(vars.Sensitive, v)
-		case TierServer:
-			vars.Server = append(vars.Server, v)
-		}
+		vars.add(v)
 	}
 
 	return vars, nil
+}
+
+// classify returns the Variable for key when it carries a tier prefix.
+func classify(key, value string) (Variable, bool) {
+	for _, t := range tiers {
+		if name, ok := strings.CutPrefix(key, t.Prefix()); ok {
+			return Variable{Name: name, Value: value, Tier: t, OriginalKey: key}, true
+		}
+	}
+	return Variable{}, false
+}
+
+// add appends v to the bucket for its tier.
+func (cv *ClassifiedVars) add(v Variable) {
+	switch v.Tier {
+	case TierPublic:
+		cv.Public = append(cv.Public, v)
+	case TierSensitive:
+		cv.Sensitive = append(cv.Sensitive, v)
+	case TierServer:
+		cv.Server = append(cv.Server, v)
+	}
 }
