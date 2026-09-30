@@ -79,6 +79,12 @@ func TestApplyDefaults(t *testing.T) {
 			wantErr: `default: variable "CODE" value does not match pattern`,
 		},
 		{
+			name:    "an invalid default is refused even while the environment overrides it",
+			vars:    ClassifiedVars{Public: []Variable{pub("TIMEOUT", "30")}},
+			decls:   map[string]*manifest.VarDecl{"TIMEOUT": {Tier: "public", Type: "number", Default: "soon", HasDefault: true}},
+			wantErr: `default: variable "TIMEOUT" must be a number`,
+		},
+		{
 			name:    "a default with no valid tier is refused",
 			decls:   map[string]*manifest.VarDecl{"FLAGS": {Tier: "", Type: "csv", Default: "", HasDefault: true}},
 			wantErr: `variable "FLAGS" declares a default but its tier "" is not public, sensitive or server`,
@@ -105,6 +111,21 @@ func TestApplyDefaults(t *testing.T) {
 				t.Errorf("vars = %+v, want %+v", vars, tt.want)
 			}
 		})
+	}
+}
+
+// On error the receiver is left untouched, even by defaults that were valid.
+func TestApplyDefaults_ErrorAddsNothing(t *testing.T) {
+	var vars ClassifiedVars
+	_, err := vars.ApplyDefaults(&manifest.Manifest{Variables: map[string]*manifest.VarDecl{
+		"A_FLAGS": {Tier: "public", Type: "csv", Default: "ok", HasDefault: true},
+		"B_PORT":  {Tier: "public", Type: "number", Default: "nope", HasDefault: true},
+	}})
+	if err == nil {
+		t.Fatal("ApplyDefaults() error = nil, want an invalid-default error")
+	}
+	if !reflect.DeepEqual(vars, ClassifiedVars{}) {
+		t.Errorf("vars = %+v after an error, want them untouched", vars)
 	}
 }
 

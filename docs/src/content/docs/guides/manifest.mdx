@@ -110,7 +110,7 @@ With `REP_PUBLIC_FEATURE_FLAGS` unset, `rep.get('FEATURE_FLAGS')` returns `""`, 
 
 - An empty string is a default: `default: ""` injects `""`.
 - A value in the environment always wins, even an empty one.
-- A default is validated against `type` and `pattern` like a set value. A default that doesn't match is a manifest error and the gateway refuses to start.
+- A default is validated against `type` and `pattern` like a set value, even while the environment overrides it. A default that doesn't match is a manifest error and the gateway refuses to start.
 - A `public` default is scanned by the [guardrails](/concepts/variable-classification/#automatic-secret-detection-guardrails).
 - `required: true` wins. A required variable that is unset fails startup even if it declares a default.
 - Hot reload re-applies defaults. Removing a variable from the environment reverts it to its default.

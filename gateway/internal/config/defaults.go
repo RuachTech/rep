@@ -11,10 +11,14 @@ import (
 
 // ApplyDefaults fills in the manifest default of every declared variable that
 // is optional, declares a default, and is set in no tier. Each default is
-// placed in the tier its declaration names, under that tier's REP_* key, and
-// is checked against the declared type and pattern exactly as a set value
-// is, so from here on it is indistinguishable from one. An empty default is
+// placed in the tier its declaration names, under that tier's REP_* key, so
+// from here on it is indistinguishable from a set value. An empty default is
 // still a default.
+//
+// Every optional default is checked against its declared tier, type and
+// pattern — including one the environment currently overrides, because
+// removing that override later (a reload) would otherwise surface a broken
+// default mid-flight. Nothing is added unless every default passes.
 //
 // A required variable is never defaulted: its absence is a startup error
 // (manifest.Validate), whatever default it declares.
@@ -37,7 +41,7 @@ func (cv *ClassifiedVars) ApplyDefaults(m *manifest.Manifest) ([]Variable, error
 	var errs []string
 	for _, name := range slices.Sorted(maps.Keys(m.Variables)) {
 		decl := m.Variables[name]
-		if set[name] || decl.Required || !decl.HasDefault {
+		if decl.Required || !decl.HasDefault {
 			continue
 		}
 		tier, ok := parseTier(decl.Tier)
@@ -49,18 +53,16 @@ func (cv *ClassifiedVars) ApplyDefaults(m *manifest.Manifest) ([]Variable, error
 			errs = append(errs, "default: "+err.Error())
 			continue
 		}
-		v := Variable{
-			Name:        name,
-			Value:       decl.Default,
-			Tier:        tier,
-			OriginalKey: tier.Prefix() + name,
+		if !set[name] {
+			added = append(added, Variable{Name: name, Value: decl.Default, Tier: tier, OriginalKey: tier.Prefix() + name})
 		}
-		cv.add(v)
-		added = append(added, v)
 	}
 
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("invalid default(s):\n  - %s", strings.Join(errs, "\n  - "))
+	}
+	for _, v := range added {
+		cv.add(v)
 	}
 	return added, nil
 }

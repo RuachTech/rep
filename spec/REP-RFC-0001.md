@@ -497,7 +497,7 @@ settings:
 A variable that declares `default` and is not `required` has a value whether or not the environment sets one. When no variable of that name is set in any tier, the gateway MUST inject the default as though `REP_<TIER>_<NAME>` had been set to it, where `<TIER>` is the declared `tier`:
 
 - A PUBLIC default appears in the payload and is readable with `rep.get()`; a SENSITIVE default is encrypted like any other SENSITIVE value; a SERVER default stays in the gateway.
-- A default MUST pass the same type and pattern validation as a set value. A default that fails is a manifest error and the gateway MUST refuse to start.
+- A default MUST pass the same type and pattern validation as a set value, whether or not the environment currently overrides it. A default that fails is a manifest error and the gateway MUST refuse to start.
 - A PUBLIC default is scanned by the guardrails (§3.3) like any other PUBLIC value.
 - An empty string is a default: `default: ""` injects `""`.
 - A value in the environment always wins, including an empty one.
