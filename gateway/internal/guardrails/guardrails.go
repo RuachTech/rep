@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/ruachtech/rep/gateway/internal/config"
+	"github.com/ruachtech/rep/gateway/internal/manifest"
 )
 
 // Warning represents a guardrail detection event.
@@ -61,64 +62,75 @@ var knownSecretPrefixes = []struct {
 //
 // Per REP-RFC-0001 §3.3, the gateway MUST scan and MUST log warnings.
 // If strict mode is enabled, the caller should treat warnings as errors.
-func Scan(vars *config.ClassifiedVars, logger *slog.Logger) *Result {
+//
+// m is the loaded manifest, or nil. A variable it declares as type csv is
+// scanned element by element (split on commas, trimmed), with every
+// heuristic applied to every element (§3.3).
+func Scan(vars *config.ClassifiedVars, m *manifest.Manifest, logger *slog.Logger) *Result {
 	result := &Result{}
 
 	for _, v := range vars.Public {
-		// Check known secret formats.
-		for _, kp := range knownSecretPrefixes {
-			if strings.HasPrefix(v.Value, kp.prefix) {
-				w := Warning{
-					VariableName:  v.Name,
-					OriginalKey:   v.OriginalKey,
-					DetectionType: "known_format",
-					Message:       fmt.Sprintf("value matches known %s format (prefix: %s)", kp.service, kp.prefix),
-				}
-				result.Warnings = append(result.Warnings, w)
-				logger.Warn("rep.guardrail.warning",
-					"variable_name", v.Name,
-					"detection_type", "known_format",
-					"detail", w.Message,
-				)
-				break // One match is enough per variable.
-			}
+		if !isCSV(m, v.Name) {
+			result.scanValue(v, v.Value, 0, logger)
+			continue
 		}
-
-		// Check Shannon entropy.
-		entropy := shannonEntropy(v.Value)
-		if entropy > 4.5 && len(v.Value) > 16 {
-			w := Warning{
-				VariableName:  v.Name,
-				OriginalKey:   v.OriginalKey,
-				DetectionType: "high_entropy",
-				Message:       fmt.Sprintf("value has high entropy (%.2f bits/char) — may be a secret", entropy),
-			}
-			result.Warnings = append(result.Warnings, w)
-			logger.Warn("rep.guardrail.warning",
-				"variable_name", v.Name,
-				"detection_type", "high_entropy",
-				"entropy", fmt.Sprintf("%.2f", entropy),
-			)
-		}
-
-		// Check length anomaly.
-		if len(v.Value) > 64 && !strings.Contains(v.Value, " ") && !strings.HasPrefix(v.Value, "http") {
-			w := Warning{
-				VariableName:  v.Name,
-				OriginalKey:   v.OriginalKey,
-				DetectionType: "length_anomaly",
-				Message:       fmt.Sprintf("value is %d chars with no spaces and no URL prefix — may be an encoded secret", len(v.Value)),
-			}
-			result.Warnings = append(result.Warnings, w)
-			logger.Warn("rep.guardrail.warning",
-				"variable_name", v.Name,
-				"detection_type", "length_anomaly",
-				"length", len(v.Value),
-			)
+		for i, elem := range strings.Split(v.Value, ",") {
+			result.scanValue(v, strings.TrimSpace(elem), i+1, logger)
 		}
 	}
 
 	return result
+}
+
+// isCSV reports whether the manifest declares name with type csv.
+func isCSV(m *manifest.Manifest, name string) bool {
+	if m == nil {
+		return false
+	}
+	d := m.Variables[name]
+	return d != nil && d.Type == "csv"
+}
+
+// scanValue runs every heuristic on value, which is the whole of v's value
+// when element is 0 and its element'th csv element (1-based) otherwise.
+func (r *Result) scanValue(v config.Variable, value string, element int, logger *slog.Logger) {
+	warn := func(detectionType, message string, extra ...any) {
+		args := append([]any{"variable_name", v.Name, "detection_type", detectionType}, extra...)
+		if element > 0 {
+			message = fmt.Sprintf("csv element %d: %s", element, message)
+			args = append(args, "csv_element", element)
+		}
+		r.Warnings = append(r.Warnings, Warning{
+			VariableName:  v.Name,
+			OriginalKey:   v.OriginalKey,
+			DetectionType: detectionType,
+			Message:       message,
+		})
+		logger.Warn("rep.guardrail.warning", args...)
+	}
+
+	// Check known secret formats.
+	for _, kp := range knownSecretPrefixes {
+		if strings.HasPrefix(value, kp.prefix) {
+			msg := fmt.Sprintf("value matches known %s format (prefix: %s)", kp.service, kp.prefix)
+			warn("known_format", msg, "detail", msg)
+			break // One match is enough per value.
+		}
+	}
+
+	// Check Shannon entropy.
+	if entropy := shannonEntropy(value); entropy > 4.5 && len(value) > 16 {
+		warn("high_entropy",
+			fmt.Sprintf("value has high entropy (%.2f bits/char) — may be a secret", entropy),
+			"entropy", fmt.Sprintf("%.2f", entropy))
+	}
+
+	// Check length anomaly.
+	if len(value) > 64 && !strings.Contains(value, " ") && !strings.HasPrefix(value, "http") {
+		warn("length_anomaly",
+			fmt.Sprintf("value is %d chars with no spaces and no URL prefix — may be an encoded secret", len(value)),
+			"length", len(value))
+	}
 }
 
 // shannonEntropy calculates the Shannon entropy (bits per character) of a string.

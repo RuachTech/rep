@@ -24,7 +24,7 @@ func buildTestMux(t *testing.T, vars *config.ClassifiedVars, staticDir string, h
 	t.Helper()
 
 	logger := slog.Default()
-	gr := guardrails.Scan(vars, logger)
+	gr := guardrails.Scan(vars, nil, logger)
 
 	keys, err := repcrypto.GenerateKeys()
 	if err != nil {

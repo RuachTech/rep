@@ -107,6 +107,8 @@ At startup, the gateway MUST scan all `REP_PUBLIC_*` values for patterns that in
 | Known key formats | AWS access keys (`AKIA...`), JWT tokens (`eyJ...`), GitHub tokens (`ghp_...`, `gho_...`), Stripe keys (`sk_live_...`, `pk_live_...`), private keys (`-----BEGIN`) |
 | Length anomalies | Strings > 64 characters that appear to be encoded secrets |
 
+When a manifest (§6) declares a variable with `type: csv`, the gateway MUST apply these heuristics to each element of the value (split on `,`, surrounding whitespace trimmed) and not to the joined string. Every heuristic still applies to every element, so a long or secret-shaped token inside a list is detected as it would be on its own. Variables of any other type, or with no manifest declaration, are scanned whole.
+
 When a potential misclassification is detected:
 
 - The gateway MUST log a **WARNING** with the variable name (but NOT the value).
