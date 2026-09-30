@@ -433,10 +433,10 @@ func TestMiddleware_StripsETagAndLastModified(t *testing.T) {
 
 func TestMiddleware_BodylessStatusPassThrough(t *testing.T) {
 	cases := []int{
-		http.StatusContinue,            // 100
-		http.StatusNoContent,           // 204
-		http.StatusNotModified,         // 304
-		http.StatusSwitchingProtocols,  // 101 (1xx range)
+		http.StatusContinue,           // 100
+		http.StatusNoContent,          // 204
+		http.StatusNotModified,        // 304
+		http.StatusSwitchingProtocols, // 101 (1xx range)
 	}
 	for _, status := range cases {
 		t.Run(http.StatusText(status), func(t *testing.T) {
