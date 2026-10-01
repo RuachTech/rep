@@ -118,6 +118,7 @@ All configuration is via CLI flags or `REP_GATEWAY_*` environment variables. Fla
 | `--upstream` | `REP_GATEWAY_UPSTREAM` | `localhost:80` | Upstream address (proxy mode) |
 | `--port` | `REP_GATEWAY_PORT` | `8080` | Listen port |
 | `--static-dir` | `REP_GATEWAY_STATIC_DIR` | `/usr/share/nginx/html` | Static files dir (embedded mode) |
+| `--manifest` | `REP_GATEWAY_MANIFEST` | (none) | `.rep.yaml` to validate against; also injects declared defaults for unset optional variables |
 | `--strict` | `REP_GATEWAY_STRICT` | `false` | Fail on guardrail warnings |
 | `--hot-reload` | `REP_GATEWAY_HOT_RELOAD` | `false` | Enable SSE hot reload |
 | `--hot-reload-mode` | `REP_GATEWAY_HOT_RELOAD_MODE` | `signal` | `file_watch`, `signal`, or `poll` |
@@ -149,6 +150,7 @@ All configuration is via CLI flags or `REP_GATEWAY_*` environment variables. Fla
 │   │                                                  │    │
 │   │  1. Reads REP_* env vars at boot                │    │
 │   │  2. Classifies: PUBLIC / SENSITIVE / SERVER     │    │
+│   │     + with --manifest: validate, inject defaults│    │
 │   │  3. Runs guardrails on PUBLIC values            │    │
 │   │  4. Generates AES-256 key + HMAC secret         │    │
 │   │  5. Encrypts SENSITIVE vars                     │    │
@@ -197,7 +199,7 @@ gateway/
 
 ## Specification Compliance
 
-This implementation targets **REP-RFC-0001 v0.1.0**. See the [conformance checklist](../spec/REP-RFC-0001.md#11-conformance) for full details.
+This implementation targets **REP-RFC-0001 v0.2.0**. See the [conformance checklist](../spec/REP-RFC-0001.md#11-conformance) for full details.
 
 | Requirement | Status |
 |---|---|
@@ -213,6 +215,14 @@ This implementation targets **REP-RFC-0001 v0.1.0**. See the [conformance checkl
 | SERVER tier never sent to client | ✅ |
 | Hot reload (optional) | ✅ |
 | Health check endpoint | ✅ |
+
+## Upgrading
+
+### To 0.1.8
+
+- **Manifest defaults are now injected.** An optional variable that declares `default:` and is unset in every tier is now served with that value, in its declared tier. Before, it was silently left out of the payload. An environment value, even an empty one, still wins, and a `required` variable is never defaulted. If your app had a fallback like `rep.get('X') || ''`, it now receives the default instead and can drop the fallback.
+- **A default that fails its own type is now a startup error.** Every optional default is checked against its `type` and `pattern` at startup, even while the environment overrides it. For example, `type: url` with `default: ""` used to be ignored and now stops the gateway with a `manifest validation: invalid default(s)` error that names the variable. Fix the default, or remove it.
+- The startup summary gains `defaulted_vars`, and each default is logged as `rep.manifest.default_applied` (name and tier, never the value). `public_vars`, `sensitive_vars`, `server_vars` and `/rep/health` counts include defaults.
 
 ## License
 

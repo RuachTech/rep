@@ -815,7 +815,7 @@ An implementation is **REP-conformant** if it satisfies the following:
 ### 11.3 Optional Features (MAY)
 
 1. Hot reload via SSE.
-2. Manifest validation.
+2. Manifest validation and default injection (§6.3).
 3. Type generation.
 4. Framework-specific adapters.
 5. Codemod tooling.
@@ -893,7 +893,7 @@ Versions follow the specification's versioning policy: patch for clarifications 
 
 | Version | Date | Changes |
 |---|---|---|
-| 0.2.0 | 2026-10-01 | §4.2 step 5 and new §6.3: the gateway MUST inject a manifest `default` for an optional variable that is unset in every tier, validated like a set value. |
+| 0.2.0 | 2026-10-01 | §4.2 step 5, new §6.3 and §11.3: the gateway MUST inject a manifest `default` for an optional variable that is unset in every tier, validated like a set value. |
 | 0.1.0 | 2026-02-18 | Initial publication. |
 
 ---
