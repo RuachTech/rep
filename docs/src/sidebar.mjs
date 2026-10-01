@@ -41,6 +41,7 @@ export const sidebar = [
     label: 'Guides',
     items: [
       { label: 'Manifest File', slug: 'guides/manifest' },
+      { label: 'Feature Flags', slug: 'guides/feature-flags' },
       { label: 'Testing', slug: 'guides/testing' },
       {
         label: 'Migration',

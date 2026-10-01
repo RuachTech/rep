@@ -1,0 +1,91 @@
+---
+title: Feature Flags — One csv Variable, Flipped Without a Rebuild
+description: Use a single REP_PUBLIC_FEATURE_FLAGS csv variable for deployment-wide feature flags. Manifest declaration, SDK reads, guardrail behaviour, flipping flags without a rebuild, and what REP flags are not.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+REP can carry simple feature flags: switches that are on or off for a whole deployment and change without a rebuild. Use one `csv` variable that lists the flags that are on.
+
+## Declare one variable
+
+```yaml
+# .rep.yaml
+variables:
+  FEATURE_FLAGS:
+    tier: public
+    type: csv
+    default: ""
+    pattern: "([a-z0-9-]+(,[a-z0-9-]+)*)?"   # optional: kebab-case names, no spaces
+    description: "Flags that are on, comma-separated"
+```
+
+Use one variable for all flags, not one variable per flag. Adding a flag is then a value change, not a manifest change, and every flag is read the same way.
+
+`default: ""` means that when `REP_PUBLIC_FEATURE_FLAGS` is unset, the gateway injects an empty list, so every flag is off. The optional `pattern` rejects typos such as stray spaces or capitals at startup, and the gateway applies it to the default as well.
+
+## Read it with the SDK
+
+```typescript
+import { rep } from '@rep-protocol/sdk';
+
+const enabled = new Set(
+  rep.get('FEATURE_FLAGS', '').split(',').map((f) => f.trim()).filter(Boolean),
+);
+
+export const isOn = (flag: string) => enabled.has(flag);
+```
+
+A flag is **off unless it is named**. There is no list of known flags to keep in sync and no "false" value to set. An unknown name is simply never checked.
+
+The second argument to `rep.get()` covers the case with no gateway at all, such as unit tests or a plain `vite dev`. Behind the gateway, the manifest default already guarantees a string.
+
+For example, a single image might serve a marketing landing page at `/` on its hosted deployment and redirect `/` straight to sign-in everywhere else:
+
+```bash
+# hosted deployment
+REP_PUBLIC_FEATURE_FLAGS=landing-page
+# self-hosted deployment: leave it unset — every flag is off
+```
+
+```typescript
+if (location.pathname === '/' && !isOn('landing-page')) location.replace('/login');
+```
+
+## Flags are public
+
+`FEATURE_FLAGS` is a PUBLIC variable, so its value is in the page source of every page the gateway serves.
+
+- **Never put a secret in a flag name.** That includes a token, a customer name, or an unreleased product's codename you can't disclose.
+- **A flag is not access control.** Hiding a button does not stop anyone calling the API behind it, so the server must still check permissions. A flag decides what the UI shows, not what a user may do.
+
+## Guardrails judge each flag, not the list
+
+The gateway's [guardrails](/concepts/variable-classification/#automatic-secret-detection-guardrails) check PUBLIC values for things that look like leaked secrets. For a `csv` variable they check each element separately. Every check (known key formats, entropy, length over 64 characters) runs on every element.
+
+- A long list of short flags never trips the checks, so adding a flag can't make `--strict` refuse to start.
+- An element that looks like a secret is still flagged, and the warning names its position (`csv element 3: …`).
+
+<Aside type="caution">
+  The Vite and Next.js dev plugins don't read the manifest, so they check the whole value. With their `strict` option on, a flag list longer than 64 characters can still throw in development. Leave `strict` off in the dev plugins, or keep the local list short.
+</Aside>
+
+## Flipping a flag
+
+You flip a flag by changing the environment, not the image:
+
+- **Restart:** set `REP_PUBLIC_FEATURE_FLAGS` and restart the container or roll the deployment. This always works.
+- **Hot reload:** with `--hot-reload`, the gateway can pick up a change without a restart, but only if it reads the value from a file it re-reads (`--env-file`). It cannot see a change to its own process environment. Pages that use `rep.onChange('FEATURE_FLAGS', …)` or the framework adapters (`useRep()` and the others) update in place. See [Hot Reload](/concepts/hot-reload/) and the [Kubernetes recipe](/deployment/kubernetes/).
+
+Either way there is no rebuild. The same image carries a different flag list into each environment.
+
+## What this is not
+
+A REP flag has one value per deployment, and every visitor to that deployment sees the same flags. That makes it a good fit for environment differences, kill switches and staged launches. It cannot do:
+
+- per-user or per-account targeting;
+- percentage or gradual rollouts;
+- A/B tests or experiments;
+- an audit trail or a UI for non-engineers.
+
+If you need any of those, use a dedicated feature-flag service. REP can still deliver that service's public client key as a PUBLIC variable.

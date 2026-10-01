@@ -76,7 +76,7 @@ import { rep } from '@rep-protocol/sdk';
 
 // PUBLIC vars — synchronous, no async, no loading state
 const apiUrl = rep.get('API_URL');
-const flags  = rep.get('FEATURE_FLAGS');
+const flags  = rep.get('FEATURE_FLAGS');   // see rep-protocol.dev/guides/feature-flags/
 
 // SENSITIVE vars — encrypted, decrypted on demand
 const key = await rep.getSecure('ANALYTICS_KEY');
