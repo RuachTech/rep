@@ -13,7 +13,7 @@ npx @rep-protocol/cli [command]
 
 Validate a `.rep.yaml` manifest against the JSON schema.
 
-This checks structure only. It does not check a `default` against its `type` or `pattern`, which the gateway does at startup. See [Defaults](/guides/manifest/#defaults).
+Structural check only: the gateway, not `rep validate`, checks each [default](/guides/manifest/#defaults) against its `type` and `pattern`.
 
 ```bash
 rep validate [--manifest <path>]

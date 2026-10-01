@@ -889,7 +889,7 @@ A: REP requires a compute layer (the gateway) between the CDN and the client. Fo
 
 ## Appendix C: Revision History
 
-Versions follow the specification's versioning policy: patch for clarifications and non-normative additions, minor for new optional features and backwards-compatible extensions, major for breaking changes. The protocol version is independent of implementation versions; the payload's `_meta.version` carries the gateway's build version.
+The protocol version is independent of implementation versions; the payload's `_meta.version` carries the gateway's build version.
 
 | Version | Date | Changes |
 |---|---|---|

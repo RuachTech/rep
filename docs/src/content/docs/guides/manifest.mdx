@@ -116,7 +116,7 @@ With `REP_PUBLIC_FEATURE_FLAGS` unset, `rep.get('FEATURE_FLAGS')` returns `""`, 
 - Hot reload re-applies defaults. Removing a variable from the environment reverts it to its default.
 
 <Aside type="caution" title="Upgrading to gateway 0.1.8">
-  Gateways before 0.1.8 never injected defaults. Two things change on upgrade. An unset optional variable with a default now appears in the payload, so app-side fallbacks such as `rep.get('X') || ''` become unnecessary. A default that fails its own `type` or `pattern`, such as `type: url` with `default: ""`, now stops the gateway at startup where it used to be silently ignored. Run the new gateway against your manifest in a staging environment before rolling it out.
+  Gateways before 0.1.8 ignored defaults. After upgrading, an invalid default (for example `type: url` with `default: ""`) stops startup. See the [gateway upgrade notes](https://github.com/ruachtech/rep/blob/main/gateway/README.md#upgrading).
 </Aside>
 
 Each injected default is logged as `rep.manifest.default_applied` with its name and tier (never its value). The startup summary counts defaults in `public_vars`, `sensitive_vars` and `server_vars` and totals them in `defaulted_vars`.

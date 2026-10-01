@@ -220,8 +220,8 @@ This implementation targets **REP-RFC-0001 v0.2.0**. See the [conformance checkl
 
 ### To 0.1.8
 
-- **Manifest defaults are now injected.** An optional variable that declares `default:` and is unset in every tier is now served with that value, in its declared tier. Before, it was silently left out of the payload. An environment value, even an empty one, still wins, and a `required` variable is never defaulted. If your app had a fallback like `rep.get('X') || ''`, it now receives the default instead and can drop the fallback.
-- **A default that fails its own type is now a startup error.** Every optional default is checked against its `type` and `pattern` at startup, even while the environment overrides it. For example, `type: url` with `default: ""` used to be ignored and now stops the gateway with a `manifest validation: invalid default(s)` error that names the variable. Fix the default, or remove it.
+- **Manifest defaults are now injected.** An optional variable that declares `default:` and is unset in every tier is now served with that value, in its declared tier. An app-side fallback such as `rep.get('X') || ''` can go.
+- **A default that fails its own type is now a startup error.** Every optional default is checked against its `type` and `pattern` at startup, even while the environment overrides it. For example, `type: url` with `default: ""` used to be ignored and now stops the gateway with a manifest validation error such as `default: variable "X" must be a valid URL`. Fix the default, or remove it.
 - The startup summary gains `defaulted_vars`, and each default is logged as `rep.manifest.default_applied` (name and tier, never the value). `public_vars`, `sensitive_vars`, `server_vars` and `/rep/health` counts include defaults.
 
 ## License

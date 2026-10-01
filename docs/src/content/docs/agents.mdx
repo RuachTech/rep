@@ -366,7 +366,7 @@ settings:
   allowed_origins: ["https://app.example.com"]
 ```
 
-An optional variable that declares `default:` is injected by the gateway when it is unset, so `rep.get('FEATURE_FLAGS')` above returns `""` rather than `undefined`. The default must satisfy its own `type`, or the gateway refuses to start.
+An optional variable that declares `default:` is [injected by the gateway](/guides/manifest.md#defaults) when it is unset, so `rep.get('FEATURE_FLAGS')` above returns `""` rather than `undefined`.
 
 ```bash
 rep validate                 # fail fast on a malformed or incomplete manifest
