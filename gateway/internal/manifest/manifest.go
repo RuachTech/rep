@@ -25,10 +25,14 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// Tiers lists the valid values of VarDecl.Tier.
+var Tiers = []string{"public", "sensitive", "server"}
 
 // VarDecl declares a single variable entry in the manifest.
 type VarDecl struct {
@@ -121,7 +125,11 @@ func Load(path string) (*Manifest, error) {
 
 // Validate checks classified environment variables against the manifest
 // declarations and returns an error listing all violations (missing required
-// variables, type errors, pattern mismatches, bad enum values).
+// variables, type errors, pattern mismatches, bad enum values). It also checks
+// every optional default against its declared tier, type and pattern, whether
+// or not the environment currently overrides it: a default depends only on the
+// manifest, and one found broken later (when a reload drops the override)
+// could no longer stop the gateway from starting.
 //
 // public, sensitive, and server are name→value maps for the three tiers.
 // Deprecated variables that are present cause a warning log entry; they do
@@ -146,14 +154,22 @@ func (m *Manifest) Validate(public, sensitive, server map[string]string, log fun
 	var errs []string
 
 	for name, decl := range m.Variables {
+		if decl.HasDefault && !decl.Required {
+			if !slices.Contains(Tiers, decl.Tier) {
+				errs = append(errs, fmt.Sprintf("variable %q declares a default but its tier %q is not one of %v", name, decl.Tier, Tiers))
+			} else if err := decl.Check(name, decl.Default); err != nil {
+				errs = append(errs, "default: "+err.Error())
+			}
+		}
+
 		value, exists := all[name]
 
 		if !exists {
 			if decl.Required {
 				errs = append(errs, fmt.Sprintf("required variable %q is not set", name))
 			}
-			// Optional + absent: a declared default is filled in and checked
-			// afterwards by config.ClassifiedVars.ApplyDefaults.
+			// Optional + absent: a declared default is filled in afterwards by
+			// config.ClassifiedVars.ApplyDefaults.
 			continue
 		}
 

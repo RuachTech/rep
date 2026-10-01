@@ -1,10 +1,8 @@
 package config
 
 import (
-	"fmt"
 	"maps"
 	"slices"
-	"strings"
 
 	"github.com/ruachtech/rep/gateway/internal/manifest"
 )
@@ -15,19 +13,16 @@ import (
 // from here on it is indistinguishable from a set value. An empty default is
 // still a default.
 //
-// Every optional default is checked against its declared tier, type and
-// pattern — including one the environment currently overrides, because
-// removing that override later (a reload) would otherwise surface a broken
-// default mid-flight. Nothing is added unless every default passes.
-//
-// A required variable is never defaulted: its absence is a startup error
-// (manifest.Validate), whatever default it declares.
+// It does not validate: manifest.Validate checks every default's tier, type
+// and pattern once at startup, and a declaration with no valid tier is skipped
+// here. A required variable is never defaulted; its absence is a startup error
+// whatever default it declares.
 //
 // It returns the variables it added, sorted by name. A nil manifest adds
 // nothing.
-func (cv *ClassifiedVars) ApplyDefaults(m *manifest.Manifest) ([]Variable, error) {
+func (cv *ClassifiedVars) ApplyDefaults(m *manifest.Manifest) []Variable {
 	if m == nil {
-		return nil, nil
+		return nil
 	}
 
 	set := make(map[string]bool, len(cv.Public)+len(cv.Sensitive)+len(cv.Server))
@@ -38,33 +33,20 @@ func (cv *ClassifiedVars) ApplyDefaults(m *manifest.Manifest) ([]Variable, error
 	}
 
 	var added []Variable
-	var errs []string
 	for _, name := range slices.Sorted(maps.Keys(m.Variables)) {
 		decl := m.Variables[name]
-		if decl.Required || !decl.HasDefault {
+		if set[name] || decl.Required || !decl.HasDefault {
 			continue
 		}
 		tier, ok := parseTier(decl.Tier)
 		if !ok {
-			errs = append(errs, fmt.Sprintf("variable %q declares a default but its tier %q is not public, sensitive or server", name, decl.Tier))
 			continue
 		}
-		if err := decl.Check(name, decl.Default); err != nil {
-			errs = append(errs, "default: "+err.Error())
-			continue
-		}
-		if !set[name] {
-			added = append(added, Variable{Name: name, Value: decl.Default, Tier: tier, OriginalKey: tier.Prefix() + name})
-		}
-	}
-
-	if len(errs) > 0 {
-		return nil, fmt.Errorf("invalid default(s):\n  - %s", strings.Join(errs, "\n  - "))
-	}
-	for _, v := range added {
+		v := Variable{Name: name, Value: decl.Default, Tier: tier, OriginalKey: tier.Prefix() + name}
 		cv.add(v)
+		added = append(added, v)
 	}
-	return added, nil
+	return added
 }
 
 // parseTier maps a manifest tier name to its Tier.

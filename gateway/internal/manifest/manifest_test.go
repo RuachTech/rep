@@ -453,6 +453,60 @@ func TestValidateOptionalAbsent(t *testing.T) {
 	}
 }
 
+func TestValidateDefaults(t *testing.T) {
+	tests := []struct {
+		name    string
+		decl    *VarDecl
+		public  map[string]string
+		wantErr string
+	}{
+		{name: "valid default passes", decl: &VarDecl{Tier: "public", Type: "number", Default: "10", HasDefault: true}},
+		{name: "empty default for csv passes", decl: &VarDecl{Tier: "public", Type: "csv", HasDefault: true}},
+		{
+			name:    "default must satisfy the declared type",
+			decl:    &VarDecl{Tier: "public", Type: "number", Default: "soon", HasDefault: true},
+			wantErr: `default: variable "X" must be a number`,
+		},
+		{
+			name:    "default must satisfy the declared pattern",
+			decl:    &VarDecl{Tier: "public", Type: "string", Pattern: `[A-Z]{3}`, Default: "abc", HasDefault: true},
+			wantErr: `default: variable "X" value does not match pattern`,
+		},
+		{
+			name:    "an invalid default is refused even while the environment overrides it",
+			decl:    &VarDecl{Tier: "public", Type: "number", Default: "soon", HasDefault: true},
+			public:  map[string]string{"X": "30"},
+			wantErr: `default: variable "X" must be a number`,
+		},
+		{
+			name:    "a default with no valid tier is refused",
+			decl:    &VarDecl{Tier: "", Type: "csv", HasDefault: true},
+			wantErr: `variable "X" declares a default but its tier "" is not one of [public sensitive server]`,
+		},
+		{
+			name:   "a required variable's default is not checked",
+			decl:   &VarDecl{Tier: "public", Type: "number", Required: true, Default: "soon", HasDefault: true},
+			public: map[string]string{"X": "30"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := &Manifest{Variables: map[string]*VarDecl{"X": tt.decl}}
+			err := m.Validate(tt.public, nil, nil, nil)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("Validate() unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("Validate() error = %v, want it to contain %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestLoadExampleManifest(t *testing.T) {
 	// Load the actual example manifest from the repo.
 	m, err := Load("../../../examples/.rep.yaml")

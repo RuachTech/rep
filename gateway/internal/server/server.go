@@ -79,12 +79,9 @@ func New(cfg *config.Config, logger *slog.Logger, version string) (*Server, erro
 
 	// Step 2c: Fill in manifest defaults for optional variables left unset
 	// (§6.3). After validation, which judges only what the environment set
-	// (a defaulted deprecated variable is not "present"); before guardrails,
-	// so a PUBLIC default is scanned.
-	defaulted, err := vars.ApplyDefaults(cfg.Manifest)
-	if err != nil {
-		return nil, fmt.Errorf("manifest validation: %w", err)
-	}
+	// (a defaulted deprecated variable is not "present") and has already
+	// checked every default; before guardrails, so a PUBLIC default is scanned.
+	defaulted := vars.ApplyDefaults(cfg.Manifest)
 	for _, v := range defaulted {
 		logger.Info("rep.manifest.default_applied", "name", v.Name, "tier", v.Tier.String())
 	}
@@ -451,9 +448,7 @@ func (s *Server) readVars() (*config.ClassifiedVars, error) {
 	if err != nil {
 		return nil, err
 	}
-	if _, err := vars.ApplyDefaults(s.cfg.Manifest); err != nil {
-		return nil, err
-	}
+	vars.ApplyDefaults(s.cfg.Manifest)
 	return vars, nil
 }
 
