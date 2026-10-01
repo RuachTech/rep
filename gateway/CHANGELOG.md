@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.8](https://github.com/RuachTech/rep/compare/gateway/v0.1.7...gateway/v0.1.8) (2026-10-01)
+
+
+### Bug Fixes
+
+* **gateway:** inject manifest defaults for unset variables ([#59](https://github.com/RuachTech/rep/issues/59)) ([66b25ff](https://github.com/RuachTech/rep/commit/66b25ffc0e21763cca62659749be6abf7a8081ec))
+* **gateway:** scan csv variables element by element in guardrails ([#60](https://github.com/RuachTech/rep/issues/60)) ([b4c5750](https://github.com/RuachTech/rep/commit/b4c575039fce5064a915a7adac9092e0e0a53991))
+
 ## [0.1.7](https://github.com/RuachTech/rep/compare/gateway/v0.1.6...gateway/v0.1.7) (2026-05-18)
 
 
