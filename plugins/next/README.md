@@ -103,7 +103,7 @@ Variables are classified by prefix:
 1. **`RepScript`** reads `.env.local` at render time, classifies variables by prefix, encrypts sensitive vars with AES-256-GCM, and outputs a `<script type="application/json">` tag.
 2. **`@rep-protocol/sdk`** (`rep.get()` / `rep.getSecure()`) reads that script tag on the client to access variables.
 3. **Session key route** serves the ephemeral decryption key so the SDK can decrypt sensitive vars in the browser.
-4. **Guardrails** scan `PUBLIC` values for patterns that look like secrets (known prefixes like `ghp_`, `sk_live_`, high Shannon entropy, long opaque strings) and warn at dev time. The plugin doesn't read `.rep.yaml`, so it scans every value whole. The gateway scans a `csv`-typed variable element by element. With `strict` on, a comma-separated list longer than 64 characters (a long feature-flag list, for example) can throw here even though the gateway accepts it.
+4. **Guardrails** scan `PUBLIC` values for patterns that look like secrets (known prefixes like `ghp_`, `sk_live_`, high Shannon entropy, long opaque strings) and warn at dev time. Unlike the gateway, it scans `csv` values whole ([details](https://rep-protocol.dev/guides/feature-flags/#dev-plugins)).
 
 Both `RepScript` and the session-key route share the same ephemeral keys via a process-wide singleton (`globalThis`), so the encryption key always matches the decryption key within a dev server lifecycle.
 

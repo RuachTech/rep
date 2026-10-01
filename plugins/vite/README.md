@@ -83,7 +83,7 @@ const anonKey = await rep.getSecure('SUPABASE_ANON_KEY'); // SENSITIVE — async
    reload when it changes, so new values take effect without restarting Vite.
 5. **Guardrails** scan `PUBLIC` values for patterns that look like secrets (known
    prefixes like `ghp_`, `sk_live_`, high Shannon entropy, long opaque strings)
-   and warn at dev time (or throw, with `strict: true`). The plugin doesn't read `.rep.yaml`, so it scans every value whole. The gateway scans a `csv`-typed variable element by element. With `strict` on, a comma-separated list longer than 64 characters (a long feature-flag list, for example) can throw here even though the gateway accepts it.
+   and warn at dev time (or throw, with `strict: true`). Unlike the gateway, it scans `csv` values whole ([details](https://rep-protocol.dev/guides/feature-flags/#dev-plugins)).
 
 ## Production
 
