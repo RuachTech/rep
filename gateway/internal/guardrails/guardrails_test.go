@@ -2,9 +2,12 @@ package guardrails
 
 import (
 	"log/slog"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/ruachtech/rep/gateway/internal/config"
+	"github.com/ruachtech/rep/gateway/internal/manifest"
 )
 
 func makeVars(publicVars ...config.Variable) *config.ClassifiedVars {
@@ -26,7 +29,7 @@ func TestScan_NoWarnings(t *testing.T) {
 		makeVar("FEATURE_FLAGS", "dark-mode,beta"),
 	)
 
-	result := Scan(vars, slog.Default())
+	result := Scan(vars, nil, slog.Default())
 	if result.HasWarnings() {
 		t.Errorf("expected no warnings, got %d: %+v", len(result.Warnings), result.Warnings)
 	}
@@ -35,7 +38,7 @@ func TestScan_NoWarnings(t *testing.T) {
 func TestScan_KnownFormat_AWS(t *testing.T) {
 	vars := makeVars(makeVar("KEY", "AKIAIOSFODNN7EXAMPLE"))
 
-	result := Scan(vars, slog.Default())
+	result := Scan(vars, nil, slog.Default())
 	if !result.HasWarnings() {
 		t.Fatal("expected warning for AWS key format")
 	}
@@ -47,7 +50,7 @@ func TestScan_KnownFormat_AWS(t *testing.T) {
 func TestScan_KnownFormat_JWT(t *testing.T) {
 	vars := makeVars(makeVar("TOKEN", "eyJhbGciOiJIUzI1NiJ9.test.payload"))
 
-	result := Scan(vars, slog.Default())
+	result := Scan(vars, nil, slog.Default())
 	found := false
 	for _, w := range result.Warnings {
 		if w.DetectionType == "known_format" {
@@ -63,7 +66,7 @@ func TestScan_KnownFormat_JWT(t *testing.T) {
 func TestScan_KnownFormat_GitHub(t *testing.T) {
 	vars := makeVars(makeVar("GH", "ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"))
 
-	result := Scan(vars, slog.Default())
+	result := Scan(vars, nil, slog.Default())
 	found := false
 	for _, w := range result.Warnings {
 		if w.DetectionType == "known_format" {
@@ -78,7 +81,7 @@ func TestScan_KnownFormat_GitHub(t *testing.T) {
 func TestScan_KnownFormat_Stripe(t *testing.T) {
 	vars := makeVars(makeVar("SK", "sk_live_xxxxxxxxxxxxxxxxxxxxxxxx"))
 
-	result := Scan(vars, slog.Default())
+	result := Scan(vars, nil, slog.Default())
 	found := false
 	for _, w := range result.Warnings {
 		if w.DetectionType == "known_format" {
@@ -93,7 +96,7 @@ func TestScan_KnownFormat_Stripe(t *testing.T) {
 func TestScan_KnownFormat_OpenAI(t *testing.T) {
 	vars := makeVars(makeVar("AI", "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"))
 
-	result := Scan(vars, slog.Default())
+	result := Scan(vars, nil, slog.Default())
 	found := false
 	for _, w := range result.Warnings {
 		if w.DetectionType == "known_format" {
@@ -108,7 +111,7 @@ func TestScan_KnownFormat_OpenAI(t *testing.T) {
 func TestScan_KnownFormat_PrivateKey(t *testing.T) {
 	vars := makeVars(makeVar("CERT", "-----BEGIN RSA PRIVATE KEY-----"))
 
-	result := Scan(vars, slog.Default())
+	result := Scan(vars, nil, slog.Default())
 	found := false
 	for _, w := range result.Warnings {
 		if w.DetectionType == "known_format" {
@@ -126,7 +129,7 @@ func TestScan_HighEntropy(t *testing.T) {
 
 	vars := makeVars(makeVar("RANDOM", highEntropy))
 
-	result := Scan(vars, slog.Default())
+	result := Scan(vars, nil, slog.Default())
 	found := false
 	for _, w := range result.Warnings {
 		if w.DetectionType == "high_entropy" {
@@ -144,7 +147,7 @@ func TestScan_LengthAnomaly(t *testing.T) {
 
 	vars := makeVars(makeVar("LONG", longValue))
 
-	result := Scan(vars, slog.Default())
+	result := Scan(vars, nil, slog.Default())
 	found := false
 	for _, w := range result.Warnings {
 		if w.DetectionType == "length_anomaly" {
@@ -162,7 +165,7 @@ func TestScan_NoFalsePositive_URL(t *testing.T) {
 
 	vars := makeVars(makeVar("CDN", longURL))
 
-	result := Scan(vars, slog.Default())
+	result := Scan(vars, nil, slog.Default())
 	for _, w := range result.Warnings {
 		if w.DetectionType == "length_anomaly" {
 			t.Error("URL should not trigger length_anomaly")
@@ -174,7 +177,7 @@ func TestScan_NoFalsePositive_ShortValue(t *testing.T) {
 	// Short high-entropy string (under 16 chars) should not trigger.
 	vars := makeVars(makeVar("SHORT", "aB3cD4eF5gH"))
 
-	result := Scan(vars, slog.Default())
+	result := Scan(vars, nil, slog.Default())
 	for _, w := range result.Warnings {
 		if w.DetectionType == "high_entropy" {
 			t.Error("short values should not trigger entropy warning")
@@ -190,7 +193,7 @@ func TestScanOnlyScansPublic(t *testing.T) {
 		Server:    []config.Variable{{Name: "DB", Value: "sk_live_secret", Tier: config.TierServer}},
 	}
 
-	result := Scan(vars, slog.Default())
+	result := Scan(vars, nil, slog.Default())
 	if result.HasWarnings() {
 		t.Error("guardrails should only scan PUBLIC vars")
 	}
@@ -222,5 +225,76 @@ func TestShannonEntropy_HighValue(t *testing.T) {
 	e := shannonEntropy("aB3cD4eF5gH6iJ7kL8mN9oP0")
 	if e <= 4.0 {
 		t.Errorf("expected high entropy for diverse string, got %f", e)
+	}
+}
+
+func TestScan_CSVJudgedByElement(t *testing.T) {
+	// 67 chars of short kebab-case flags: long, no spaces, no URL prefix.
+	const flagList = "dark-mode,new-checkout,beta-search,lyrics-web,stage-timer,obs-scene"
+	opaque := strings.Repeat("Zm9vYmFy", 10) // 80 chars, base64-looking
+	declared := func(typ string) *manifest.Manifest {
+		return &manifest.Manifest{Variables: map[string]*manifest.VarDecl{
+			"FEATURE_FLAGS": {Tier: "public", Type: typ},
+		}}
+	}
+	csv, str := declared("csv"), declared("string")
+
+	tests := []struct {
+		name     string
+		manifest *manifest.Manifest
+		value    string
+		want     []string // detection types, in order
+		wantMsg  string   // substring of the first warning's message
+	}{
+		{name: "long csv of short tokens passes", manifest: csv, value: flagList},
+		{name: "spaces after commas are trimmed", manifest: csv, value: strings.ReplaceAll(flagList, ",", " , ")},
+		{name: "empty csv passes", manifest: csv, value: ""},
+		{
+			name: "one long opaque token inside a csv is flagged", manifest: csv,
+			value: "dark-mode," + opaque + ",beta",
+			want:  []string{"length_anomaly"}, wantMsg: "csv element 2: value is 80 chars",
+		},
+		{
+			name: "a known secret format past the first element is flagged", manifest: csv,
+			value: "dark-mode,ghp_" + strings.Repeat("ab", 18),
+			want:  []string{"known_format"}, wantMsg: "csv element 2: value matches known GitHub Personal Access Token",
+		},
+		{
+			name: "a high-entropy element is flagged", manifest: csv,
+			value: "beta,aB3$xY9!mK2@pQ7#nL5&wR8*",
+			want:  []string{"high_entropy"}, wantMsg: "csv element 2: value has high entropy",
+		},
+		{
+			name: "the same comma list typed string is still flagged whole", manifest: str,
+			value: flagList,
+			want:  []string{"length_anomaly"}, wantMsg: "value is 67 chars",
+		},
+		{
+			name: "without a manifest a comma list is flagged whole", manifest: nil,
+			value: flagList,
+			want:  []string{"length_anomaly"}, wantMsg: "value is 67 chars",
+		},
+		{
+			name: "a long opaque non-csv value is flagged", manifest: str,
+			value: opaque,
+			want:  []string{"length_anomaly"}, wantMsg: "value is 80 chars",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Scan(makeVars(makeVar("FEATURE_FLAGS", tt.value)), tt.manifest, slog.Default())
+
+			var got []string
+			for _, w := range result.Warnings {
+				got = append(got, w.DetectionType)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Fatalf("detections = %v, want %v (%+v)", got, tt.want, result.Warnings)
+			}
+			if tt.wantMsg != "" && !strings.HasPrefix(result.Warnings[0].Message, tt.wantMsg) {
+				t.Errorf("message = %q, want prefix %q", result.Warnings[0].Message, tt.wantMsg)
+			}
+		})
 	}
 }

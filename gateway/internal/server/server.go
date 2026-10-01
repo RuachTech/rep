@@ -88,7 +88,7 @@ func New(cfg *config.Config, logger *slog.Logger, version string) (*Server, erro
 
 	// Step 3–4: Run secret detection guardrails.
 	logger.Info("running guardrail scan on PUBLIC tier variables")
-	gr := guardrails.Scan(vars, logger)
+	gr := guardrails.Scan(vars, cfg.Manifest, logger)
 
 	if gr.HasWarnings() && cfg.Strict {
 		return nil, fmt.Errorf(

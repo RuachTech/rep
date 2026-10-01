@@ -107,6 +107,8 @@ At startup, the gateway MUST scan all `REP_PUBLIC_*` values for patterns that in
 | Known key formats | AWS access keys (`AKIA...`), JWT tokens (`eyJ...`), GitHub tokens (`ghp_...`, `gho_...`), Stripe keys (`sk_live_...`, `pk_live_...`), private keys (`-----BEGIN`) |
 | Length anomalies | Strings > 64 characters that appear to be encoded secrets |
 
+When a manifest (§6) declares a variable with `type: csv`, the gateway MUST apply these heuristics to each element of the value (split on `,`, surrounding whitespace trimmed) and not to the joined string. Every heuristic still applies to every element, so a long or secret-shaped token inside a list is detected as it would be on its own. Variables of any other type, or with no manifest declaration, are scanned whole.
+
 When a potential misclassification is detected:
 
 - The gateway MUST log a **WARNING** with the variable name (but NOT the value).
@@ -893,7 +895,7 @@ The protocol version is independent of implementation versions; the payload's `_
 
 | Version | Date | Changes |
 |---|---|---|
-| 0.2.0 | 2026-10-01 | §4.2 step 5, new §6.3 and §11.3: the gateway MUST inject a manifest `default` for an optional variable that is unset in every tier, validated like a set value. |
+| 0.2.0 | 2026-10-01 | §4.2 step 5, new §6.3 and §11.3: the gateway MUST inject a manifest `default` for an optional variable that is unset in every tier, validated like a set value. §3.3: for a manifest variable of `type: csv`, guardrails MUST apply to each element rather than the joined string. |
 | 0.1.0 | 2026-02-18 | Initial publication. |
 
 ---

@@ -1,0 +1,88 @@
+---
+title: Feature Flags — One csv Variable, Flipped Without a Rebuild
+description: Use a single REP_PUBLIC_FEATURE_FLAGS csv variable for deployment-wide feature flags. Manifest declaration, SDK reads, guardrail behaviour, flipping flags without a rebuild, and what REP flags are not.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+REP can carry simple feature flags: switches that are on or off for a whole deployment. Use one `csv` variable that lists the flags that are on.
+
+## Declare one variable
+
+```yaml
+# .rep.yaml
+variables:
+  FEATURE_FLAGS:
+    tier: public
+    type: csv
+    default: ""
+    pattern: "([a-z0-9-]+(,[a-z0-9-]+)*)?"   # optional: kebab-case names, no spaces
+    description: "Flags that are on, comma-separated"
+```
+
+Use one variable for all flags, not one per flag. Adding a flag is then a value change, not a manifest change.
+
+With `default: ""`, an unset `REP_PUBLIC_FEATURE_FLAGS` becomes an empty list, so every flag is off (see [Defaults](/guides/manifest/#defaults)). The optional `pattern` rejects typos such as stray spaces or capitals at startup.
+
+## Read it with the SDK
+
+```typescript
+import { rep } from '@rep-protocol/sdk';
+
+const enabled = new Set(
+  rep.get('FEATURE_FLAGS', '').split(',').map((f) => f.trim()).filter(Boolean),
+);
+
+export const isOn = (flag: string) => enabled.has(flag);
+```
+
+A flag is **off unless it is named**. There is no list of known flags to keep in sync and no "false" value to set.
+
+The second argument to `rep.get()` covers the case with no gateway at all, such as unit tests or a plain `vite dev`. Behind the gateway, the manifest default already guarantees a string.
+
+For example, a single image might serve a marketing landing page at `/` on its hosted deployment and redirect `/` straight to sign-in everywhere else:
+
+```bash
+# hosted deployment
+REP_PUBLIC_FEATURE_FLAGS=landing-page
+# self-hosted deployment: leave it unset — every flag is off
+```
+
+```typescript
+if (location.pathname === '/' && !isOn('landing-page')) location.replace('/login');
+```
+
+## Flags are public
+
+`FEATURE_FLAGS` is a PUBLIC variable, so its value is in the page source of every page the gateway serves.
+
+- **Never put a secret in a flag name.** That includes a token, a customer name, or an unreleased product's codename you can't disclose.
+- **A flag is not access control.** Hiding a button does not stop anyone calling the API behind it, so the server must still check permissions.
+
+## Guardrails judge each flag, not the list
+
+The gateway's [guardrails](/concepts/variable-classification/#automatic-secret-detection-guardrails) check a `csv` value one element at a time. A long list of short flags can't make `--strict` refuse to start, and an element that looks like a secret is still flagged.
+
+### Dev plugins
+
+<Aside type="caution">
+  The Vite and Next.js dev plugins don't read `.rep.yaml`, so they check the whole value. With their `strict` option on, a flag list longer than 64 characters can still throw in development even though the gateway accepts it. Leave `strict` off in the dev plugins, or keep the local list short.
+</Aside>
+
+## Flipping a flag
+
+You flip a flag by changing the environment, not the image:
+
+- **Restart:** set `REP_PUBLIC_FEATURE_FLAGS` and restart the container or roll the deployment.
+- **Hot reload:** with `--hot-reload` and `--env-file`, the gateway picks up edits to that file without a restart; it does not see changes to its own process environment. Pages using `rep.onChange('FEATURE_FLAGS', …)` or a framework adapter update in place. See [Hot Reload](/concepts/hot-reload/), the [Kubernetes recipe](/deployment/kubernetes/), and the end-to-end [Next.js example](/examples/nextjs-csr-embedded/).
+
+## What this is not
+
+A REP flag has one value per deployment, shared by every visitor. That makes it a good fit for environment differences, kill switches and staged launches. It cannot do:
+
+- per-user or per-account targeting;
+- percentage or gradual rollouts;
+- A/B tests or experiments;
+- an audit trail or a UI for non-engineers.
+
+If you need any of those, use a dedicated feature-flag service. REP can still deliver that service's public client key as a PUBLIC variable.

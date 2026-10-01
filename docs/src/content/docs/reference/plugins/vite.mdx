@@ -48,7 +48,7 @@ repPlugin({
 - **Injects `<script id="__rep__">`** into every HTML response via `transformIndexHtml`, using the same JSON shape, HMAC integrity token, and SRI hash format as the Go gateway. `rep.get()`, `rep.getSecure()`, and `rep.verify()` behave identically whether the payload came from the plugin or the gateway.
 - **Watches the env file.** Changes to the file at `env` trigger a full page reload (`server.ws.send({ type: 'full-reload' })`) — no restart needed.
 - **Serves `GET /rep/session-key`** as dev middleware, so `rep.getSecure()` works without a separate gateway process. Unlike the gateway's endpoint, this dev version has no rate limiting or single-use enforcement — it's not meant to run in production.
-- **Runs guardrails** (entropy + known secret-format scanning) on every `REP_PUBLIC_*` value at each rebuild, logging warnings through the Vite server logger.
+- **Runs guardrails** (entropy + known secret-format scanning) on every `REP_PUBLIC_*` value at each rebuild, logging warnings through the Vite server logger. Unlike the gateway, it [scans `csv` values whole](/guides/feature-flags/#dev-plugins).
 - **Ephemeral keys per dev-server start.** A fresh AES key and HMAC secret are generated when the dev server boots and again on every env-file change — matching the gateway's "new keys on every restart" behavior.
 
 <Aside type="caution">

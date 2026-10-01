@@ -69,7 +69,7 @@ The easiest way to get full REP support in development. The plugin injects the s
 </Tabs>
 
 <Aside>
-  Both plugins run guardrails on PUBLIC vars and warn if they look like secrets. Use the `strict` option to make warnings into errors.
+  Both plugins run guardrails on PUBLIC vars and warn if they look like secrets. Use the `strict` option to make warnings into errors. Unlike the gateway, they [scan `csv` values whole](/guides/feature-flags/#dev-plugins).
 </Aside>
 
 ## Option B: Default values (simplest)
