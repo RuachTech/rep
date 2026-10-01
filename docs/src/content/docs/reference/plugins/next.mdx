@@ -65,6 +65,7 @@ Only needed if you read `REP_SENSITIVE_*` variables with `rep.getSecure()` / `us
 - **Server Component only.** `RepScript` reads the filesystem (`env`) and generates keys server-side; it cannot be used in a Client Component. Consume the injected payload from Client Components via `rep.get()` / `useRep()` as usual — the SDK reads the DOM, not React context.
 - **Script content is Go-escaped** (`<`, `>`, `&` → `<`, `>`, `&`) before being written via `dangerouslySetInnerHTML`, preventing `</script>` breakout from untrusted env values. The tag still carries `type="application/json"`, so the browser never executes it.
 - **Ephemeral keys are process-scoped**, held in a module-level singleton (`getOrCreateKeys()`) so the same key survives across route handler invocations within one `next dev` process.
+- **Guardrails scan every `REP_PUBLIC_*` value whole.** `RepScript` doesn't read `.rep.yaml`, so unlike the gateway it doesn't scan a `csv`-typed variable element by element. With `strict`, a comma-separated list longer than 64 characters (a long feature-flag list, for example) can throw here even though the gateway accepts it.
 - **Byte-identical payload** to the Go gateway and the Vite plugin (sorted keys, same HMAC + SRI format) — `rep.verify()` and `rep.meta()` behave the same regardless of which one produced the payload.
 
 ## App Router only

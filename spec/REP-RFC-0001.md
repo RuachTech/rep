@@ -895,7 +895,7 @@ The protocol version is independent of implementation versions; the payload's `_
 
 | Version | Date | Changes |
 |---|---|---|
-| 0.2.0 | 2026-10-01 | §4.2 step 5, new §6.3 and §11.3: the gateway MUST inject a manifest `default` for an optional variable that is unset in every tier, validated like a set value. |
+| 0.2.0 | 2026-10-01 | §4.2 step 5, new §6.3 and §11.3: the gateway MUST inject a manifest `default` for an optional variable that is unset in every tier, validated like a set value. §3.3: for a manifest variable of `type: csv`, guardrails MUST apply to each element rather than the joined string. |
 | 0.1.0 | 2026-02-18 | Initial publication. |
 
 ---

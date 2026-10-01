@@ -70,7 +70,7 @@ At startup, the gateway scans all `REP_PUBLIC_*` values for patterns indicating 
 | **Known key formats** | AWS keys (`AKIA...`), JWTs (`eyJ...`), GitHub tokens (`ghp_...`), Stripe keys (`sk_live_...`), private keys (`-----BEGIN`) |
 | **Length anomalies** | Strings > 64 characters that may be encoded secrets |
 
-A variable declared `type: csv` in the [manifest](/guides/manifest/) is scanned one element at a time (split on commas, whitespace trimmed) rather than as one string. A long list of short feature flags therefore doesn't trip the length check under `--strict`. A long or secret-shaped token inside the list is still flagged, and the warning names its position (`csv element 3: …`). Every other value is scanned whole.
+A variable declared `type: csv` in the [manifest](/guides/manifest/) is scanned one element at a time (split on commas, whitespace trimmed) rather than as one string. A long list of short feature flags therefore doesn't trip the length check under `--strict`. A long or secret-shaped token inside the list is still flagged, and the warning names its position (`csv element 3: …` in the message, `csv_element` in the log). Every other value is scanned whole. The Vite and Next.js dev plugins don't read the manifest, so they scan every value whole. See [Feature Flags](/guides/feature-flags/).
 
 When a potential misclassification is detected:
 

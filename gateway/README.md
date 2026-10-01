@@ -222,6 +222,7 @@ This implementation targets **REP-RFC-0001 v0.2.0**. See the [conformance checkl
 
 - **Manifest defaults are now injected.** An optional variable that declares `default:` and is unset in every tier is now served with that value, in its declared tier. An app-side fallback such as `rep.get('X') || ''` can go.
 - **A default that fails its own type is now a startup error.** Every optional default is checked against its `type` and `pattern` at startup, even while the environment overrides it. For example, `type: url` with `default: ""` used to be ignored and now stops the gateway with a manifest validation error such as `default: variable "X" must be a valid URL`. Fix the default, or remove it.
+- **`csv` variables are scanned element by element.** For a variable the manifest declares `type: csv`, the guardrails check each comma-separated element instead of the joined string, so a long list of short tokens no longer fails `--strict`. A long or secret-shaped element is still flagged by position (`csv element N`, log attribute `csv_element`), and a known key format anywhere in the list is now caught. The dev plugins [still scan whole values](https://rep-protocol.dev/guides/feature-flags/#dev-plugins).
 - The startup summary gains `defaulted_vars`, and each default is logged as `rep.manifest.default_applied` (name and tier, never the value). `public_vars`, `sensitive_vars`, `server_vars` and `/rep/health` counts include defaults.
 
 ## License
