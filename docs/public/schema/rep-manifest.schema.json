@@ -39,7 +39,7 @@
           },
           "default": {
             "type": ["string", "number", "boolean"],
-            "description": "Default value if the environment variable is not set. Only valid for non-required variables. Non-string values are coerced to strings."
+            "description": "Injected by the gateway when the variable is unset in every tier; ignored if required. Must satisfy type and pattern, or the gateway refuses to start. Non-string values are coerced to strings."
           },
           "description": {
             "type": "string",

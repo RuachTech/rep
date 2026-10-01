@@ -50,7 +50,7 @@ The gateway performs these steps in order at process start:
 2. Read all `REP_*` environment variables
 3. Classify each into PUBLIC, SENSITIVE, or SERVER tier
 4. Validate name uniqueness after prefix stripping
-5. Load and validate `.rep.yaml` manifest if `--manifest` is specified
+5. Load and validate `.rep.yaml` manifest if `--manifest` is specified, then inject the `default` of any optional variable left unset
 6. Run secret detection guardrails on PUBLIC variables
 7. Exit with error if `--strict` and guardrails triggered
 8. Generate ephemeral master key, derive AES-256 key via HKDF-SHA256

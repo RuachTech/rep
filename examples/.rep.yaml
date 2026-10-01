@@ -26,7 +26,7 @@ variables:
     tier: public
     type: csv
     required: false
-    default: ""
+    default: ""        # injected by the gateway when unset, so rep.get() returns "" not undefined
     description: "Comma-separated list of enabled feature flags"
     example: "dark-mode,new-checkout,ai-assist"
 

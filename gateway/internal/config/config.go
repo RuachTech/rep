@@ -147,7 +147,7 @@ func Parse(args []string, version string) (*Config, error) {
 	fs.StringVar(&cfg.Upstream, "upstream", envOrDefault("REP_GATEWAY_UPSTREAM", "localhost:80"), "Upstream server address (proxy mode)")
 	fs.IntVar(&cfg.Port, "port", envOrDefaultInt("REP_GATEWAY_PORT", 8080), "Listen port")
 	fs.StringVar(&cfg.StaticDir, "static-dir", envOrDefault("REP_GATEWAY_STATIC_DIR", "/usr/share/nginx/html"), "Static file directory (embedded mode)")
-	fs.StringVar(&cfg.ManifestPath, "manifest", envOrDefault("REP_GATEWAY_MANIFEST", manifestPath), "Path to .rep.yaml manifest")
+	fs.StringVar(&cfg.ManifestPath, "manifest", envOrDefault("REP_GATEWAY_MANIFEST", manifestPath), "Path to .rep.yaml manifest (validates variables, injects defaults)")
 	fs.BoolVar(&cfg.Strict, "strict", envOrDefaultBool("REP_GATEWAY_STRICT", defaultStrict), "Exit on guardrail warnings")
 	fs.BoolVar(&cfg.HotReload, "hot-reload", envOrDefaultBool("REP_GATEWAY_HOT_RELOAD", defaultHotReload), "Enable hot reload SSE endpoint")
 	fs.StringVar(&cfg.HotReloadMode, "hot-reload-mode", envOrDefault("REP_GATEWAY_HOT_RELOAD_MODE", defaultHotReloadMode), `Hot reload mode: "file_watch", "signal", or "poll"`)

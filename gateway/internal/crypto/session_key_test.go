@@ -184,4 +184,3 @@ func TestExtractIP_RemoteAddr(t *testing.T) {
 		t.Errorf("expected 192.168.1.1, got %s", ip)
 	}
 }
-

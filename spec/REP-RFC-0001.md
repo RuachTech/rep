@@ -2,11 +2,11 @@
 
 ```
 Title:    Runtime Environment Protocol (REP)
-Version:  0.1.0
+Version:  0.2.0
 Status:   Active
 Authors:  Olamide Adebayo (Ruach Tech)
 Created:  2026-02-18
-Updated:  2026-02-21
+Updated:  2026-10-01
 License:  CC BY 4.0
 ```
 
@@ -150,6 +150,8 @@ On process start, the gateway MUST perform the following steps in order:
 5.  IF --manifest specified → LOAD the .rep.yaml manifest and validate
     all declared variables against the environment (required vars present,
     types match, patterns match). On validation failure → EXIT with error.
+    Then INJECT the `default` of every declared variable that is not
+    required and is unset in every tier (see §6.3).
 6.  RUN secret detection guardrails on PUBLIC tier variables
 7.  IF --strict AND guardrails triggered → EXIT with error
 8.  GENERATE ephemeral master key, derive AES-256 encryption key via
@@ -163,7 +165,8 @@ On process start, the gateway MUST perform the following steps in order:
     - Health check endpoint (/rep/health)
     - Hot reload SSE endpoint (/rep/changes) [if enabled]
 13. START accepting connections
-14. LOG startup summary: variable counts per tier, any guardrail warnings
+14. LOG startup summary: variable counts per tier (injected defaults
+    included), any guardrail warnings
 ```
 
 ### 4.3 HTML Injection
@@ -489,6 +492,18 @@ settings:
 | `json` | Must be valid JSON |
 | `enum` | Must match one of the values in the `values` array |
 
+### 6.3 Defaults
+
+A variable that declares `default` and is not `required` has a value whether or not the environment sets one. When no variable of that name is set in any tier, the gateway MUST inject the default as though `REP_<TIER>_<NAME>` had been set to it, where `<TIER>` is the declared `tier`:
+
+- A PUBLIC default appears in the payload and is readable with `rep.get()`; a SENSITIVE default is encrypted like any other SENSITIVE value; a SERVER default stays in the gateway.
+- A default MUST pass the same type and pattern validation as a set value, whether or not the environment currently overrides it. A default that fails is a manifest error and the gateway MUST refuse to start.
+- A PUBLIC default is scanned by the guardrails (§3.3) like any other PUBLIC value.
+- An empty string is a default: `default: ""` injects `""`.
+- A value in the environment always wins, including an empty one.
+- `required: true` takes precedence. A required variable that is unset is a startup error even if it declares a default.
+- Defaults are re-applied on every hot reload, so removing a variable from the environment reverts it to its default rather than deleting it.
+
 ---
 
 ## 7. Gateway Configuration
@@ -800,7 +815,7 @@ An implementation is **REP-conformant** if it satisfies the following:
 ### 11.3 Optional Features (MAY)
 
 1. Hot reload via SSE.
-2. Manifest validation.
+2. Manifest validation and default injection (§6.3).
 3. Type generation.
 4. Framework-specific adapters.
 5. Codemod tooling.
@@ -869,6 +884,17 @@ A: Partially — see the [Security Model](SECURITY-MODEL.md) for an honest asses
 
 **Q: What about CDN-hosted SPAs (Cloudflare Pages, Vercel, Netlify)?**
 A: REP requires a compute layer (the gateway) between the CDN and the client. For CDN-only deployments, you can run the gateway as an edge function or serverless function. A Cloudflare Workers adapter is planned.
+
+---
+
+## Appendix C: Revision History
+
+The protocol version is independent of implementation versions; the payload's `_meta.version` carries the gateway's build version.
+
+| Version | Date | Changes |
+|---|---|---|
+| 0.2.0 | 2026-10-01 | §4.2 step 5, new §6.3 and §11.3: the gateway MUST inject a manifest `default` for an optional variable that is unset in every tier, validated like a set value. |
+| 0.1.0 | 2026-02-18 | Initial publication. |
 
 ---
 

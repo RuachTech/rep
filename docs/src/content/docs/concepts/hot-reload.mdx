@@ -40,6 +40,8 @@ id: 1708267831000
 | `rep:config:update` | A variable's value changed or a new variable was added |
 | `rep:config:delete` | A variable was removed |
 
+Manifest [defaults](/guides/manifest/#defaults) are re-applied on every reload. Removing a variable that declares a default sends `rep:config:update` with the default value, not `rep:config:delete`.
+
 ## Change detection modes
 
 The gateway supports three modes for detecting environment variable changes:

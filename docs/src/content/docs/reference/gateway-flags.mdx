@@ -17,7 +17,7 @@ rep-gateway [flags]
 | `--upstream` | `localhost:80` | Upstream server address (proxy mode only) |
 | `--port` | `8080` | Listen port |
 | `--static-dir` | `/usr/share/nginx/html` | Static file directory (embedded mode only) |
-| `--manifest` | — | Path to `.rep.yaml` manifest file |
+| `--manifest` | — | Path to `.rep.yaml` manifest (validates variables, injects [defaults](/guides/manifest/#defaults)) |
 | `--env-file` | — | Path to `.env` file (env vars take precedence) |
 | `--strict` | `false` | Exit on guardrail warnings |
 | `--hot-reload` | `false` | Enable hot reload SSE endpoint |

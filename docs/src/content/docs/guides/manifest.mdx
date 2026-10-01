@@ -75,7 +75,7 @@ settings:
 | `tier` | `public` / `sensitive` / `server` | Yes | Security classification |
 | `type` | see below | Yes | Value type constraint |
 | `required` | boolean | No | Whether the variable must be present at startup |
-| `default` | string | No | Default value if not provided |
+| `default` | string | No | Value the gateway injects when the variable is unset. See [Defaults](#defaults) |
 | `description` | string | No | Human-readable description |
 | `example` | string | No | Example value |
 | `pattern` | string | No | Regex pattern the value must match |
@@ -94,6 +94,32 @@ settings:
 | `csv` | Comma-separated values |
 | `json` | Must be valid JSON |
 | `enum` | Must match one of the `values` array entries |
+
+## Defaults
+
+When a variable declares `default`, isn't `required`, and isn't set in any tier, the gateway injects the default as though it had been set. It goes into the declared `tier`, so a `public` default is in the payload and `rep.get()` returns it:
+
+```yaml
+FEATURE_FLAGS:
+  tier: public
+  type: csv
+  default: ""
+```
+
+With `REP_PUBLIC_FEATURE_FLAGS` unset, `rep.get('FEATURE_FLAGS')` returns `""`, not `undefined`.
+
+- An empty string is a default: `default: ""` injects `""`.
+- A value in the environment always wins, even an empty one.
+- A default is validated against `type` and `pattern` like a set value, even while the environment overrides it. A default that doesn't match is a manifest error and the gateway refuses to start.
+- A `public` default is scanned by the [guardrails](/concepts/variable-classification/#automatic-secret-detection-guardrails).
+- `required: true` wins. A required variable that is unset fails startup even if it declares a default.
+- Hot reload re-applies defaults. Removing a variable from the environment reverts it to its default.
+
+<Aside type="caution" title="Upgrading to gateway 0.1.8">
+  Gateways before 0.1.8 ignored defaults. After upgrading, an invalid default (for example `type: url` with `default: ""`) stops startup. See the [gateway upgrade notes](https://github.com/ruachtech/rep/blob/main/gateway/README.md#upgrading).
+</Aside>
+
+Each injected default is logged as `rep.manifest.default_applied` with its name and tier (never its value). The startup summary counts defaults in `public_vars`, `sensitive_vars` and `server_vars` and totals them in `defaulted_vars`.
 
 ## Settings
 
