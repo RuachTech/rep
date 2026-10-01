@@ -2,11 +2,11 @@
 
 ```
 Title:    Runtime Environment Protocol (REP)
-Version:  0.1.0
+Version:  0.2.0
 Status:   Active
 Authors:  Olamide Adebayo (Ruach Tech)
 Created:  2026-02-18
-Updated:  2026-02-21
+Updated:  2026-10-01
 License:  CC BY 4.0
 ```
 
@@ -884,6 +884,17 @@ A: Partially — see the [Security Model](SECURITY-MODEL.md) for an honest asses
 
 **Q: What about CDN-hosted SPAs (Cloudflare Pages, Vercel, Netlify)?**
 A: REP requires a compute layer (the gateway) between the CDN and the client. For CDN-only deployments, you can run the gateway as an edge function or serverless function. A Cloudflare Workers adapter is planned.
+
+---
+
+## Appendix C: Revision History
+
+Versions follow the specification's versioning policy: patch for clarifications and non-normative additions, minor for new optional features and backwards-compatible extensions, major for breaking changes. The protocol version is independent of implementation versions; the payload's `_meta.version` carries the gateway's build version.
+
+| Version | Date | Changes |
+|---|---|---|
+| 0.2.0 | 2026-10-01 | §4.2 step 5 and new §6.3: the gateway MUST inject a manifest `default` for an optional variable that is unset in every tier, validated like a set value. |
+| 0.1.0 | 2026-02-18 | Initial publication. |
 
 ---
 
