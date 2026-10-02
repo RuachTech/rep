@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.17](https://github.com/RuachTech/rep/compare/cli-v0.1.16...cli-v0.1.17) (2026-10-02)
+
+
+### Bug Fixes
+
+* **gateway:** inject manifest defaults for unset variables ([#59](https://github.com/RuachTech/rep/issues/59)) ([66b25ff](https://github.com/RuachTech/rep/commit/66b25ffc0e21763cca62659749be6abf7a8081ec))
+
 ## [0.1.16](https://github.com/RuachTech/rep/compare/cli-v0.1.15...cli-v0.1.16) (2026-08-24)
 
 

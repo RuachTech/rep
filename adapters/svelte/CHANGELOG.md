@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.17](https://github.com/RuachTech/rep/compare/svelte-v0.1.16...svelte-v0.1.17) (2026-10-02)
+
+
+### Miscellaneous Chores
+
+* **svelte:** Synchronize rep-packages versions
+
 ## [0.1.16](https://github.com/RuachTech/rep/compare/svelte-v0.1.15...svelte-v0.1.16) (2026-08-24)
 
 

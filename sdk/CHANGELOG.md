@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.17](https://github.com/RuachTech/rep/compare/sdk-v0.1.16...sdk-v0.1.17) (2026-10-02)
+
+
+### Miscellaneous Chores
+
+* **sdk:** Synchronize rep-packages versions
+
 ## [0.1.16](https://github.com/RuachTech/rep/compare/sdk-v0.1.15...sdk-v0.1.16) (2026-08-24)
 
 
