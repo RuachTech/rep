@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.17](https://github.com/RuachTech/rep/compare/vite-v0.1.16...vite-v0.1.17) (2026-10-02)
+
+
+### Bug Fixes
+
+* **gateway:** scan csv variables element by element in guardrails ([#60](https://github.com/RuachTech/rep/issues/60)) ([b4c5750](https://github.com/RuachTech/rep/commit/b4c575039fce5064a915a7adac9092e0e0a53991))
+
 ## [0.1.16](https://github.com/RuachTech/rep/compare/vite-v0.1.15...vite-v0.1.16) (2026-08-24)
 
 

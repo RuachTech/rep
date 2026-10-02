@@ -1,6 +1,6 @@
 {
   "name": "@rep-protocol/cli",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "CLI tool for the Runtime Environment Protocol (REP).",
   "gatewayVersion": "0.1.8",
   "bin": {
